@@ -151,10 +151,12 @@ Exactly one of `markup`, `text` and `components` must be present (`bad_request` 
 Every message is delivered as ordinary chat lines, rendered **per recipient** (section 1.6):
 - Public messages start each line with `<Dave> ` (name in `botNameColor`).
 - Whispers use vanilla's translated "Dave whispers to you: " prefix (gray italic); the body keeps its own style.
-- Blank lines are dropped and long lines wrap at spaces (`maxLineLength`) without splitting a link.
+- Blank lines are dropped. Lines wider than the chat box (`chatWidth` pixels, measured with the default font) are
+  cut at spaces into a `<Dave>` line plus continuation lines indented by two spaces, without splitting a word or a
+  link, so the client never wraps them. Only a word wider than a whole line is cut.
 - A message stops after `maxLinesPerMessage` lines with `... (truncated)` (for `markup` and `text` alike, with a
-  warning). Markup longer than 4 characters per visible character (`maxLinesPerMessage` x line width) is cut before
-  it is parsed, with a warning.
+  warning). Markup longer than one character per pixel of output (`maxLinesPerMessage` x line width in pixels) is
+  cut before it is parsed, with a warning.
 - A line whose JSON would exceed 30000 bytes is degraded: item hovers become text hovers, then hovers are
   removed, then it becomes plain text, each with a warning.
 - Each recipient hears `replySound` (only they do). Players with the client half get `thinking{clear:true}`, which
@@ -308,6 +310,10 @@ The full, prompt-ready spec is [docs/dave-markup.md](docs/dave-markup.md). In sh
   - closing: `{/}` closes the innermost span, `{/name}` closes that one and anything opened after it, `{/color}`
     closes the innermost color;
   - `{br}` is a line break.
+- **Highlights:** `{m:name}` colors a machine name aqua and `{i:name}` an item or fluid name green (a `|label`
+  replaces the name). Common-rarity `{item:}` links and `{fluid:}` links use the same green. In text without a
+  color of its own, the renderer colors voltage tiers in GregTech's tier colors and numbers with units
+  (`480 EU/t`, `45s`, `x16`) in yellow.
 - **Tokens:** `{kind:argument|label}`. The label is optional and split off at the **last** unescaped `|`. In a
   hover text, `\n` is a newline; in other token arguments and labels it is a space.
 
@@ -584,7 +590,7 @@ Server-side validation of client packets:
   announced to the agent as a fresh `client_mod` event. Servers older than 0.1.2 log it as an unknown kind and
   ignore it (the opt-in then reaches them on the next login).
 - `ask`: only accepted after `client_hello`; `text` must be 1..`maxAskLength` characters and must contain a question
-  after its trigger prefix (a bare `dave,` is refused); at most one per `askCooldownMillis` per player. Refused asks
+  after its trigger prefix (a bare `dave` or `dave,` is refused); at most one per `askCooldownMillis` per player. Refused asks
   get a gray notice saying why (empty, too long, or "slow down"). `context` is dropped unless it is a JSON object of at
   most 16 KiB. An accepted ask is shown to **every player** as an ordinary chat line, `<Player> text`, exactly like
   vanilla chat and with the trigger prefix kept, because Dave's replies are public and others may join in. It is
@@ -666,11 +672,11 @@ tick by the client half. Later milestones (Groovy eval, introspection) submit th
 | network | `authTimeoutSeconds` | `10` | Drop connections that have not authenticated by then. |
 | network | `maxClients` | `4` | Maximum simultaneous WebSocket connections. |
 | network | `maxMessageBytes` | `1048576` | Largest inbound WebSocket frame. |
-| chat | `triggerPrefixes` | `dave,` `@dave` `!dave` | Case-insensitive prefixes that address Dave. |
+| chat | `triggerPrefixes` | `dave` `@dave` `!dave` | Case-insensitive prefixes that address Dave. A prefix ending in a letter must be followed by a space or punctuation (`Dave how…`, `dave, …`), never another letter or an apostrophe (`davey`, `dave's`). Plain chat also counts with a greeting first (`hey dave, …`) or the name last (`how do I make steel, dave?`); clickable `{send:}` text must still start with a prefix. |
 | chat | `forwardAllChat` | `false` | Forward every chat message (`triggered:false` for the rest). |
 | chat | `botName` | `Dave` | Name in `<Dave>`. |
 | chat | `botNameColor` | `aqua` | Minecraft color name for the plain-chat name. |
-| chat | `maxLineLength` | `200` | Plain-chat wrap width. |
+| chat | `chatWidth` | `320` | Players' chat box width in pixels (vanilla default at 100%). Replies are cut into lines this wide. |
 | chat | `maxLinesPerMessage` | `40` | Plain-chat lines per `say` before truncation. |
 | chat | `notifyWhenOffline` | `true` | Tell a player when they address Dave and no agent is connected. |
 | chat | `askCooldownMillis` | `1000` | Minimum time between asks from one client. |

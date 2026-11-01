@@ -19,7 +19,7 @@ Dave runs on the **Claude Code CLI** with a Claude subscription, not with API to
 ```
 
 1. **DaveBridge** is one Forge mod jar with a server side and a client side.
-   - **Server side (required).** It forwards chat that starts with a trigger (`dave,`, `@dave`, `!dave`) over a WebSocket that requires a token. Replies are queued and shown as `<Dave>` on the server thread. It is the **only** link to Claude, and it relays traffic for clients.
+   - **Server side (required).** It forwards chat that starts with a trigger (`dave`, `@dave`, `!dave`; `Dave how…` and `Dave, …` both count) over a WebSocket that requires a token. Replies are queued and shown as `<Dave>` on the server thread. It is the **only** link to Claude, and it relays traffic for clients.
    - **Client side (optional).** Players without it still use Dave through plain chat. With it, questions carry context (what the player is looking at or holding, which GUI is open), and Dave's replies render more nicely. Later, Dave can run code on that player's client, but only if the player opts in with `clientEvalAllowed`, which is off by default.
 2. **The Dave daemon** holds the socket and exposes the server to Claude as MCP tools: `say`, `eval`, `describe`, and the saved-query library.
 3. **Claude** runs as one long-lived `claude -p --input-format stream-json --output-format stream-json` process. To answer a question about any mod, it greps the decompiled pack in `gtnh-src/`, then writes a Groovy script and runs it in the live server. No mod needs a hand-written connector.

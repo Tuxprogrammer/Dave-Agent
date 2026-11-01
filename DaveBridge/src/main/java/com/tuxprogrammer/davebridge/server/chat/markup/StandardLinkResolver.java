@@ -36,7 +36,7 @@ public final class StandardLinkResolver implements LinkResolver {
         public String[] commandAllowlist = { "/dave", "/davebridge", "/bq_client", "/nei_bookmark", "/savewaypoint",
             "/guidenhc" };
         /** {send:} text must start with one of these (Dave's trigger prefixes). */
-        public String[] sendPrefixes = { "dave,", "@dave", "!dave" };
+        public String[] sendPrefixes = { "dave", "@dave", "!dave" };
         /** The waypoint mod (sharewhereiam) is installed, so /savewaypoint exists on clients. */
         public boolean waypoints;
         /** GuideNH is installed, so /guidenhc exists on clients. */

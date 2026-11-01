@@ -124,7 +124,8 @@ public final class TestHooks {
             ChunkCoordinates spawn = overworld == null ? new ChunkCoordinates(0, 64, 0) : overworld.getSpawnPoint();
             pos = new double[] { spawn.posX + 0.5, spawn.posY, spawn.posZ + 0.5 };
         }
-        String prompt = TriggerMatcher.match(ask.question, com.tuxprogrammer.davebridge.common.Config.triggerPrefixes);
+        String prompt = TriggerMatcher
+            .addressed(ask.question, com.tuxprogrammer.davebridge.common.Config.triggerPrefixes);
         if (prompt == null) {
             prompt = ask.question;
         }

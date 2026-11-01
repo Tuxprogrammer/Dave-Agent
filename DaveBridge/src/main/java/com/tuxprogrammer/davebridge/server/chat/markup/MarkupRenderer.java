@@ -5,6 +5,7 @@ import java.util.List;
 
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 
 /**
@@ -12,53 +13,75 @@ import net.minecraft.util.IChatComponent;
  * players with the DaveBridge client half and one for everyone else. Lines carry no prefix; the caller adds
  * {@code <Dave>} or the whisper prefix.
  * <p>
- * Wrapping: plain text wraps at spaces; a token's component is never split. An exclusive token (a BetterQuesting
- * quest link) never shares a line with another link.
+ * Wrapping happens here, not on the client: vanilla chat wraps one styled piece at a time and cuts a piece with no
+ * space in it mid-word. Lines are measured in pixels of the default font ({@link FontWidths}) and broken only at
+ * spaces, so a word that runs across several colors ("45s" then ")") moves to the next line whole. A line Dave
+ * started gets the caller's {@code <Dave>} prefix; a continuation line is marked {@code continued} and indented with
+ * {@link #INDENT} instead. A token's component is never split, and an exclusive token (a BetterQuesting quest link)
+ * never shares a line with another link. Only a word wider than a whole line is cut.
  */
 public final class MarkupRenderer {
 
     public static final String TRUNCATED = "... (truncated)";
 
-    /**
-     * Markup longer than this many characters per allowed output character (lines x width) is cut before parsing:
-     * nothing past it could be shown, and the parser and wrapper slow down on huge single lines.
-     */
-    static final int MARKUP_CHARS_PER_VISIBLE_CHAR = 4;
+    /** What the caller puts before a continuation line instead of the {@code <Dave>} prefix. */
+    public static final String INDENT = "  ";
 
-    /** Rendering output. {@code modLines} and {@code vanillaLines} have the same length. */
+    /**
+     * Rendering output. {@code modLines}, {@code vanillaLines} and {@code continued} have the same length; a continued
+     * line carries on the line before it (indent it, no prefix).
+     */
     public static final class Rendered {
 
         public final List<IChatComponent> modLines;
         public final List<IChatComponent> vanillaLines;
         public final List<ResolvedLink.RecipientAction> actions;
         public final List<String> warnings;
+        public final List<Boolean> continued;
 
         public Rendered(List<IChatComponent> modLines, List<IChatComponent> vanillaLines,
             List<ResolvedLink.RecipientAction> actions, List<String> warnings) {
+            this(modLines, vanillaLines, actions, warnings, null);
+        }
+
+        public Rendered(List<IChatComponent> modLines, List<IChatComponent> vanillaLines,
+            List<ResolvedLink.RecipientAction> actions, List<String> warnings, List<Boolean> continued) {
             this.modLines = modLines;
             this.vanillaLines = vanillaLines;
             this.actions = actions;
             this.warnings = warnings;
+            if (continued == null) {
+                continued = new ArrayList<>();
+                for (int i = 0; i < vanillaLines.size(); i++) continued.add(Boolean.FALSE);
+            }
+            this.continued = continued;
         }
     }
 
     private final LinkResolver resolver;
-    private final int width;
+    private final int firstWidth;
+    private final int nextWidth;
     private final int maxLines;
 
     /**
-     * @param width    visible characters per line, excluding the prefix
-     * @param maxLines lines kept before the message is cut with {@link #TRUNCATED}
+     * @param firstWidth pixels for a line Dave started, after the prefix the caller adds
+     * @param nextWidth  pixels for a continuation line, after {@link #INDENT}
+     * @param maxLines   lines kept before the message is cut with {@link #TRUNCATED}
      */
-    public MarkupRenderer(LinkResolver resolver, int width, int maxLines) {
+    public MarkupRenderer(LinkResolver resolver, int firstWidth, int nextWidth, int maxLines) {
         this.resolver = resolver;
-        this.width = Math.max(20, width);
+        this.firstWidth = Math.max(60, firstWidth);
+        this.nextWidth = Math.max(60, nextWidth);
         this.maxLines = Math.max(1, maxLines);
     }
 
-    /** The longest markup {@link #render} parses; the rest is dropped with a warning. */
+    /**
+     * The longest markup {@link #render} parses (one markup character per pixel of allowed output, several per
+     * visible character); the rest is dropped with a warning: nothing past it could be shown, and the parser and
+     * wrapper slow down on huge single lines.
+     */
     int maxMarkupLength() {
-        return maxLines * width * MARKUP_CHARS_PER_VISIBLE_CHAR;
+        return maxLines * nextWidth;
     }
 
     public Rendered render(String markup) {
@@ -79,7 +102,14 @@ public final class MarkupRenderer {
                 pieces.add(Piece.NEWLINE);
             } else if (node instanceof Markup.Text) {
                 Markup.Text t = (Markup.Text) node;
-                pieces.add(Piece.text(t.text, ChatStyles.apply(t.style, null)));
+                if (t.style.color != null) {
+                    pieces.add(Piece.text(t.text, ChatStyles.apply(t.style, null)));
+                } else {
+                    // Text Dave left uncolored gets the automatic highlights (tiers, numbers).
+                    for (Highlights.Span span : Highlights.split(t.text)) {
+                        pieces.add(Piece.text(span.text, ChatStyles.apply(t.style, highlight(span.style))));
+                    }
+                }
             } else if (node instanceof Markup.Token) {
                 Markup.Token token = (Markup.Token) node;
                 ResolvedLink link;
@@ -102,26 +132,34 @@ public final class MarkupRenderer {
             }
         }
 
-        List<Integer> soft = new ArrayList<>();
-        List<List<Piece>> lines = layout(pieces, soft);
+        List<Line> lines = layout(pieces);
         if (lines.size() > maxLines) {
             warnings.add("message cut to " + maxLines + " lines");
             lines = new ArrayList<>(lines.subList(0, maxLines - 1));
-            soft = new ArrayList<>(soft.subList(0, maxLines - 1));
-            soft.set(soft.size() - 1, HARD);
-            List<Piece> cut = new ArrayList<>();
-            cut.add(Piece.text(TRUNCATED, new ChatStyle().setColor(net.minecraft.util.EnumChatFormatting.GRAY)));
+            Line cut = new Line(true);
+            cut.add(Piece.text(TRUNCATED, new ChatStyle().setColor(EnumChatFormatting.GRAY)));
             lines.add(cut);
-            soft.add(HARD);
         }
-        lines = joinSoftBreaks(lines, soft);
         List<IChatComponent> mod = new ArrayList<>();
         List<IChatComponent> vanilla = new ArrayList<>();
-        for (List<Piece> line : lines) {
-            mod.add(build(line, true));
-            vanilla.add(build(line, false));
+        List<Boolean> continued = new ArrayList<>();
+        for (Line line : lines) {
+            mod.add(build(line.pieces, true));
+            vanilla.add(build(line.pieces, false));
+            continued.add(line.continued);
         }
-        return new Rendered(mod, vanilla, actions, warnings);
+        return new Rendered(mod, vanilla, actions, warnings, continued);
+    }
+
+    /** The base style of a highlight span: a color name, then "b" / "u" flags; null for none. */
+    static ChatStyle highlight(String[] style) {
+        if (style == null) return null;
+        ChatStyle out = new ChatStyle().setColor(EnumChatFormatting.getValueByName(style[0]));
+        for (int i = 1; i < style.length; i++) {
+            if ("b".equals(style[i])) out.setBold(Boolean.TRUE);
+            if ("u".equals(style[i])) out.setUnderlined(Boolean.TRUE);
+        }
+        return out;
     }
 
     /**
@@ -164,26 +202,30 @@ public final class MarkupRenderer {
 
     private static final class Piece {
 
-        static final Piece NEWLINE = new Piece(null, null, null, null);
+        static final Piece NEWLINE = new Piece(null, null, null, 0);
 
         final String text; // non-null for splittable text
         final ChatStyle style;
         final ResolvedLink link; // non-null for atoms
-        final Integer length;
+        final int width; // pixels
 
-        private Piece(String text, ChatStyle style, ResolvedLink link, Integer length) {
+        private Piece(String text, ChatStyle style, ResolvedLink link, int width) {
             this.text = text;
             this.style = style;
             this.link = link;
-            this.length = length;
+            this.width = width;
         }
 
         static Piece text(String text, ChatStyle style) {
-            return new Piece(text, style, null, text.length());
+            return new Piece(text, style, null, FontWidths.width(text, bold(style)));
         }
 
+        /**
+         * An exclusive (quest) link counts as zero width: the BQ client rewrites its whole line into one component
+         * ("[Quest: #id - name]" plus the text around it), which the client then wraps at spaces itself.
+         */
         static Piece atom(ResolvedLink link) {
-            return new Piece(null, null, link, visibleLength(link.vanilla));
+            return new Piece(null, null, link, link.ownLine ? 0 : pixelWidth(link.vanilla));
         }
 
         boolean isNewline() {
@@ -191,165 +233,197 @@ public final class MarkupRenderer {
         }
     }
 
-    static int visibleLength(IChatComponent c) {
+    private static boolean bold(ChatStyle style) {
+        return style != null && style.getBold();
+    }
+
+    /** Pixel width of a component as the client draws it (each part in its own boldness). */
+    static int pixelWidth(IChatComponent c) {
         try {
-            return c.getUnformattedText()
-                .length();
+            int w = 0;
+            for (Object o : c) {
+                IChatComponent part = (IChatComponent) o;
+                w += FontWidths.width(part.getUnformattedTextForChat(), bold(part.getChatStyle()));
+            }
+            return w;
         } catch (RuntimeException e) {
-            return 10;
+            return 60;
         }
+    }
+
+    /** One output line: pieces and the pixels they use. */
+    private static final class Line {
+
+        final boolean continued;
+        final List<Piece> pieces = new ArrayList<>();
+        int used;
+
+        Line(boolean continued) {
+            this.continued = continued;
+        }
+
+        void add(Piece p) {
+            pieces.add(p);
+            used += p.width;
+        }
+
+        boolean isEmpty() {
+            return pieces.isEmpty();
+        }
+
+        boolean hasLink(boolean exclusiveOnly) {
+            for (Piece p : pieces) {
+                if (p.link != null && (!exclusiveOnly || p.link.ownLine)) return true;
+            }
+            return false;
+        }
+    }
+
+    private int cap(Line line) {
+        return line.continued ? nextWidth : firstWidth;
     }
 
     /**
-     * Rejoins lines that were split only because they were wider than {@link #width}, so one paragraph is one chat
-     * message and the client wraps it to the player's chat width. Splitting it would start every piece with the bot's
-     * name, often mid-sentence. Dave's own line breaks stay, and so do the splits that keep an exclusive (quest) link
-     * apart from other links.
+     * Lays pieces into lines. Words (runs without spaces, possibly across styles and links) are placed whole with the
+     * spaces before them; a word that does not fit starts a continuation line, and the spaces before it are dropped.
      */
-    static List<List<Piece>> joinSoftBreaks(List<List<Piece>> lines, List<Integer> soft) {
-        List<List<Piece>> out = new ArrayList<>();
-        for (int i = 0; i < lines.size(); i++) {
-            List<Piece> line = lines.get(i);
-            if (i > 0 && soft.get(i - 1) != HARD && canShare(out.get(out.size() - 1), line)) {
-                List<Piece> prev = out.get(out.size() - 1);
-                if (soft.get(i - 1) == SOFT_SPACE) {
-                    prev.add(Piece.text(" ", new ChatStyle()));
-                }
-                prev.addAll(line);
-            } else {
-                out.add(new ArrayList<>(line));
-            }
-        }
-        return out;
-    }
-
-    /** Whether two lines may become one message: never an exclusive link together with another link. */
-    private static boolean canShare(List<Piece> a, List<Piece> b) {
-        int links = 0;
-        boolean exclusive = false;
-        for (List<Piece> line : java.util.Arrays.asList(a, b)) {
-            for (Piece p : line) {
-                if (p.link != null) {
-                    links++;
-                    exclusive |= p.link.ownLine;
-                }
-            }
-        }
-        return !exclusive || links <= 1;
-    }
-
-    /** How a laid-out line ended: a real break, or width alone (rejoined with or without the space it replaced). */
-    static final int HARD = 0, SOFT_SPACE = 1, SOFT_JOIN = 2;
-
-    /** Lays pieces into lines of at most {@link #width}; {@code soft} gets, per line, how it ended. */
-    private List<List<Piece>> layout(List<Piece> pieces, List<Integer> soft) {
-        List<List<Piece>> lines = new ArrayList<>();
-        List<Piece> cur = new ArrayList<>();
-        int[] curLen = { 0 };
-
+    private List<Line> layout(List<Piece> pieces) {
+        List<Line> lines = new ArrayList<>();
+        Line line = new Line(false);
+        List<Piece> spaces = new ArrayList<>();
+        List<Piece> word = new ArrayList<>();
         for (Piece p : pieces) {
             if (p.isNewline()) {
-                endLine(lines, soft, HARD, cur, curLen);
-                cur = new ArrayList<>();
-                continue;
-            }
-            if (p.link != null) {
-                // An exclusive link (quest) may share its line with text, but not with other links: the BQ client
-                // replaces the whole line, which would drop their clicks and hovers.
-                boolean lineHasLink = false, lineExclusive = false;
-                for (Piece q : cur) {
-                    if (q.link != null) {
-                        lineHasLink = true;
-                        lineExclusive |= q.link.ownLine;
+                line = place(lines, line, spaces, word);
+                finish(lines, line);
+                line = new Line(false);
+                spaces.clear();
+                word.clear();
+            } else if (p.link != null) {
+                word.add(p);
+            } else {
+                String t = p.text;
+                int i = 0;
+                while (i < t.length()) {
+                    boolean space = t.charAt(i) == ' ';
+                    int k = i;
+                    while (k < t.length() && (t.charAt(k) == ' ') == space) k++;
+                    Piece run = Piece.text(t.substring(i, k), p.style);
+                    if (space) {
+                        if (!word.isEmpty()) {
+                            line = place(lines, line, spaces, word);
+                            spaces.clear();
+                            word.clear();
+                        }
+                        spaces.add(run);
+                    } else {
+                        word.add(run);
                     }
+                    i = k;
                 }
-                boolean clash = p.link.ownLine ? lineHasLink : lineExclusive;
-                if (clash || (curLen[0] > 0 && curLen[0] + p.length > width)) {
-                    endLine(lines, soft, clash ? HARD : SOFT_SPACE, cur, curLen);
-                    cur = new ArrayList<>();
-                }
-                cur.add(p);
-                curLen[0] += p.length;
-                continue;
-            }
-            String rest = curLen[0] == 0 ? stripLeading(p.text) : p.text;
-            while (!rest.isEmpty()) {
-                int available = width - curLen[0];
-                if (rest.length() <= available) {
-                    cur.add(Piece.text(rest, p.style));
-                    curLen[0] += rest.length();
-                    break;
-                }
-                int cut = available > 0 ? rest.lastIndexOf(' ', available) : -1;
-                int end = SOFT_SPACE;
-                if (cut > 0) {
-                    cur.add(Piece.text(rest.substring(0, cut), p.style));
-                    rest = rest.substring(cut + 1);
-                } else if (curLen[0] > 0) {
-                    // nothing fits on this line; continue on the next one
-                } else {
-                    cur.add(Piece.text(rest.substring(0, available), p.style));
-                    rest = rest.substring(available);
-                    end = SOFT_JOIN; // cut inside a word
-                }
-                curLen[0] += 1; // force the line to end
-                endLine(lines, soft, end, cur, curLen);
-                cur = new ArrayList<>();
-                rest = stripLeading(rest);
             }
         }
-        endLine(lines, soft, HARD, cur, curLen);
+        line = place(lines, line, spaces, word);
+        finish(lines, line);
         return lines;
     }
 
-    private static void endLine(List<List<Piece>> lines, List<Integer> soft, int softEnd, List<Piece> cur,
-        int[] curLen) {
-        // drop lines that are empty or only whitespace
-        boolean blank = true;
-        for (Piece p : cur) {
-            if (p.link != null || !p.text.trim()
-                .isEmpty()) {
-                blank = false;
-                break;
+    /** Places one word (and the spaces before it); returns the line that is now current. */
+    private Line place(List<Line> lines, Line line, List<Piece> spaces, List<Piece> word) {
+        if (word.isEmpty()) {
+            return line; // trailing spaces
+        }
+        int spaceWidth = 0, wordWidth = 0;
+        boolean wordLink = false, wordExclusive = false;
+        for (Piece p : spaces) spaceWidth += p.width;
+        for (Piece p : word) {
+            wordWidth += p.width;
+            if (p.link != null) {
+                wordLink = true;
+                wordExclusive |= p.link.ownLine;
             }
         }
-        if (!blank) {
-            // trim trailing spaces of the last text piece
-            Piece last = cur.get(cur.size() - 1);
-            if (last.link == null) {
-                String t = rtrim(last.text);
-                cur.set(cur.size() - 1, Piece.text(t, last.style));
-            }
-            lines.add(new ArrayList<>(cur));
-            soft.add(softEnd);
+        // An exclusive link (quest) may share its line with text, but not with other links: the BQ client replaces
+        // the whole line, which would drop their clicks and hovers.
+        boolean clash = wordExclusive ? line.hasLink(false) : wordLink && line.hasLink(true);
+        if (!line.isEmpty() && (clash || line.used + spaceWidth + wordWidth > cap(line))) {
+            finish(lines, line);
+            line = new Line(true);
+        } else if (!line.isEmpty()) {
+            for (Piece p : spaces) line.add(p);
         }
-        cur.clear();
-        curLen[0] = 0;
+        if (line.used + wordWidth <= cap(line)) {
+            for (Piece p : word) line.add(p);
+            return line;
+        }
+        // Wider than a whole line: cut it where lines end (links stay whole).
+        for (Piece p : word) {
+            if (p.link != null) {
+                if (!line.isEmpty() && line.used + p.width > cap(line)) {
+                    finish(lines, line);
+                    line = new Line(true);
+                }
+                line.add(p);
+                continue;
+            }
+            String rest = p.text;
+            boolean bold = bold(p.style);
+            while (!rest.isEmpty()) {
+                int n = FontWidths.fit(rest, bold, cap(line) - line.used);
+                if (n == 0 && line.isEmpty()) n = 1; // always make progress
+                if (n > 0) {
+                    line.add(Piece.text(rest.substring(0, n), p.style));
+                    rest = rest.substring(n);
+                }
+                if (!rest.isEmpty()) {
+                    finish(lines, line);
+                    line = new Line(true);
+                }
+            }
+        }
+        return line;
     }
 
-    private static IChatComponent build(List<Piece> line, boolean mod) {
-        IChatComponent root = new ChatComponentText("");
-        for (Piece p : line) {
-            if (p.link != null) {
-                root.appendSibling((mod ? p.link.mod : p.link.vanilla).createCopy());
-            } else if (!p.text.isEmpty()) {
-                IChatComponent c = new ChatComponentText(p.text);
-                c.setChatStyle(p.style.createShallowCopy());
-                root.appendSibling(c);
+    /** Adds the line unless it has nothing visible. */
+    private static void finish(List<Line> lines, Line line) {
+        for (Piece p : line.pieces) {
+            if (p.link != null || !p.text.trim()
+                .isEmpty()) {
+                lines.add(line);
+                return;
             }
         }
+    }
+
+    /** One component per run of same-styled text (layout splits words apart; this joins them back), plus links. */
+    private static IChatComponent build(List<Piece> line, boolean mod) {
+        IChatComponent root = new ChatComponentText("");
+        StringBuilder text = new StringBuilder();
+        ChatStyle style = null;
+        for (Piece p : line) {
+            if (p.link == null && style != null && p.style.equals(style)) {
+                text.append(p.text);
+                continue;
+            }
+            appendText(root, text, style);
+            style = null;
+            if (p.link != null) {
+                root.appendSibling((mod ? p.link.mod : p.link.vanilla).createCopy());
+            } else {
+                text.append(p.text);
+                style = p.style;
+            }
+        }
+        appendText(root, text, style);
         return root;
     }
 
-    private static String stripLeading(String s) {
-        int i = 0;
-        while (i < s.length() && s.charAt(i) == ' ') i++;
-        return s.substring(i);
-    }
-
-    private static String rtrim(String s) {
-        int end = s.length();
-        while (end > 0 && s.charAt(end - 1) == ' ') end--;
-        return s.substring(0, end);
+    private static void appendText(IChatComponent root, StringBuilder text, ChatStyle style) {
+        if (text.length() > 0) {
+            IChatComponent c = new ChatComponentText(text.toString());
+            c.setChatStyle(style.createShallowCopy());
+            root.appendSibling(c);
+            text.setLength(0);
+        }
     }
 }

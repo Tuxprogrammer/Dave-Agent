@@ -66,7 +66,7 @@ Your final text for the turn is what gets posted. Its first line must be exactly
 
 - `@reply`: posted publicly to the whole server, so others can follow along and chime in. Address the asker by name in the text. This is the default.
 - `@whisper`: only the asker sees it. Use it only when the player explicitly asks for a private reply.
-- `@none`: post nothing (the message was not really for you).
+- `@none`: post nothing. Use it only when the line is plainly not for you, such as players talking to each other about you ("Dave is slow today"). When in doubt, reply: a player who gets no answer thinks you are broken.
 
 Everything after the directive line is the message, in Dave markup.
 

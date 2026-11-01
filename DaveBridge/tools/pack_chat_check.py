@@ -8,7 +8,8 @@
 Logs a scripted plain 1.7.10 client (PlainBot, no DaveBridge client half) and a scripted client half (ModBot) into
 the pack server, claiming exactly the server's mod list (read over eval), and checks what players really receive:
 
-  * a long multi-sentence reply (wider than maxLineLength) arrives as ONE chat message, not several <Dave> lines;
+  * a long multi-sentence reply arrives as one <Dave> line plus indented continuation lines, each narrower than the
+    chat box (chatWidth pixels), broken only at spaces, so the client never wraps it or cuts a word;
   * {quest:NOR and NAND Chips} resolves although the quest's real title is "§5§lNOR and NAND Chips", and the line
     carries BetterQuesting's share token for that quest, alone and unstyled.
 
@@ -32,6 +33,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import e2e_chat_test as e2e  # noqa: E402
 from e2e_chat_test import Bot, flatten, components, queue_get_matching  # noqa: E402
 from eval_check import Rcon, read_token  # noqa: E402
+
+# Advances of the default 1.7.10 font (FontWidths.java); anything else is 6.
+_WIDTHS = {**{c: 4 for c in " I[]t"}, **{c: 2 for c in "!,.:;i|"}, **{c: 3 for c in "'`l"},
+           **{c: 5 for c in "\"()*<>fk{}"}, "@": 7, "~": 7}
+
+
+def pixel_width(text):
+    return sum(_WIDTHS.get(c, 6) for c in re.sub("\u00a7.", "", text))
+
 
 QUEST = "NOR and NAND Chips"
 LONG = ("Steel comes from the Electric Blast Furnace once you reach MV, but before that you can make it in the "
@@ -67,7 +77,7 @@ async def main(a):
     r = await request({"type": "eval", "script": (
         "def q = com.tuxprogrammer.davebridge.server.compat.BqQuests.find(params.quest)\n"
         "[mods: cpw.mods.fml.common.Loader.instance().getActiveModList().collect { [it.modId, it.version] },\n"
-        " width: com.tuxprogrammer.davebridge.common.Config.maxLineLength,\n"
+        " width: com.tuxprogrammer.davebridge.common.Config.chatWidth,\n"
         " quest: q == null ? null : [name: q.name, token: q.shareToken()]]"), "params": {"quest": QUEST},
         "timeoutMs": 5000})
     res = r.get("result") or {}
@@ -76,7 +86,7 @@ async def main(a):
           quest.get("name", "").startswith("§") and quest.get("name", "").endswith(QUEST), quest or r)
     # claim exactly the server's mods (DaveBridge is added by Bot for the client half; it is optional for others)
     e2e.MODS = [(m, v) for m, v in res.get("mods", []) if m != "davebridge"]
-    print("server: %d mods, maxLineLength %s" % (len(e2e.MODS), res.get("width")))
+    print("server: %d mods, chatWidth %s px" % (len(e2e.MODS), res.get("width")))
 
     rcon = None
     if a.rcon_password_file:
@@ -112,12 +122,15 @@ async def main(a):
                 bot.chat.get_nowait()
         ack = await request({"type": "say", "target": "@a", "markup": LONG})
         check("long reply acked without warnings", ack.get("type") == "ack" and not ack.get("warnings"), ack)
+        width = res.get("width") or 320
         for bot in (plain, mod):
-            msgs = [m for m in await received(bot, "Electric Blast Furnace") if "Dave" in flatten(m)]
-            text = flatten(msgs[0]) if msgs else ""
-            check(f"{bot.name}: a {len(LONG)}-character reply is ONE chat message",
-                  len(msgs) == 1 and text.startswith("<Dave> ") and text.endswith("opens up the HV tier.")
-                  and len(text) >= len(LONG), [flatten(m) for m in msgs])
+            lines = [flatten(m) for m in await received(bot, "<Dave> Steel comes")]
+            joined = " ".join(l[len("<Dave> "):] if i == 0 else l.strip() for i, l in enumerate(lines))
+            check(f"{bot.name}: a {len(LONG)}-character reply is one <Dave> line plus indented continuations",
+                  len(lines) > 1 and lines[0].startswith("<Dave> ")
+                  and all(l.startswith("  ") and not l.startswith("   ") for l in lines[1:]), lines)
+            check(f"{bot.name}: every line fits {width} px, and only whole words moved",
+                  all(pixel_width(l) <= width for l in lines) and joined == LONG, lines)
 
         markup = ("Next, wafers and chips: {quest:%s}\nEngrave the wafer in a "
                   "{recipe:gregtech:gt.metaitem.03:32042|Laser Engraver} first." % QUEST)

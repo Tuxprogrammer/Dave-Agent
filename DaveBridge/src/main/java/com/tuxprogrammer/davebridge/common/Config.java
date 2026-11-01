@@ -36,11 +36,11 @@ public final class Config {
     public static volatile int maxMessageBytes = 1 << 20;
 
     // chat
-    public static volatile String[] triggerPrefixes = { "dave,", "@dave", "!dave" };
+    public static volatile String[] triggerPrefixes = { "dave", "@dave", "!dave" };
     public static volatile boolean forwardAllChat = false;
     public static volatile String botName = "Dave";
     public static volatile String botNameColor = "aqua";
-    public static volatile int maxLineLength = 200;
+    public static volatile int chatWidth = 320;
     public static volatile int maxLinesPerMessage = 40;
     public static volatile boolean notifyWhenOffline = true;
     public static volatile int askCooldownMillis = 1000;
@@ -165,7 +165,7 @@ public final class Config {
         triggerPrefixes = cfg.getStringList(
             "triggerPrefixes",
             CATEGORY_CHAT,
-            new String[] { "dave,", "@dave", "!dave" },
+            new String[] { "dave", "@dave", "!dave" },
             "Chat messages starting with one of these (case-insensitive) are forwarded with triggered=true.");
         forwardAllChat = cfg.getBoolean(
             "forwardAllChat",
@@ -178,8 +178,14 @@ public final class Config {
             CATEGORY_CHAT,
             "aqua",
             "Color of the bot name: a Minecraft color name such as aqua, gold, light_purple.");
-        maxLineLength = cfg
-            .getInt("maxLineLength", CATEGORY_CHAT, 200, 20, 1000, "Longer lines are wrapped into several chat lines.");
+        chatWidth = cfg.getInt(
+            "chatWidth",
+            CATEGORY_CHAT,
+            320,
+            100,
+            1000,
+            "Width of the players' chat box in pixels (320 is vanilla's default at 100% chat width). Dave's replies "
+                + "are cut at spaces into lines this wide, so the client never wraps them and never splits a word.");
         maxLinesPerMessage = cfg.getInt(
             "maxLinesPerMessage",
             CATEGORY_CHAT,

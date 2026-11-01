@@ -75,7 +75,8 @@ class MarkupRendererTest {
         StandardLinkResolver.Options o = new StandardLinkResolver.Options();
         o.waypoints = true;
         o.guides = true;
-        return new MarkupRenderer(new StandardLinkResolver(o, new FakeGame()), width, maxLines);
+        // width in full-width (6 px) characters, for readable tests
+        return new MarkupRenderer(new StandardLinkResolver(o, new FakeGame()), width * 6, width * 6, maxLines);
     }
 
     static List<IChatComponent> flat(IChatComponent line) {
@@ -162,32 +163,43 @@ class MarkupRendererTest {
     }
 
     @Test
-    void widthBreaksStayOneMessageAndBlankLinesDrop() {
-        // A paragraph wider than the line width is still one chat message (the client wraps it), so the bot's name
-        // never lands mid-sentence; Dave's own newlines still start new messages.
+    void widthBreaksBecomeContinuationLinesAndBlankLinesDrop() {
+        // Lines are cut at spaces to fit the chat box (120 px here), so the client never splits a word; the extra
+        // lines are marked continued (indented, no <Dave>). Dave's own newlines start new prefixed lines.
         String markup = "aaaa bbbb cccc dddd eeee ffff {item:gregtech:steel|Steel Ingot Label} gggg\n\n\nend";
         MarkupRenderer.Rendered r = renderer(20, 40).render(markup);
-        assertEquals(2, r.vanillaLines.size());
+        List<String> texts = new ArrayList<>();
+        for (IChatComponent c : r.vanillaLines) texts.add(c.getUnformattedText());
         assertEquals(
-            "aaaa bbbb cccc dddd eeee ffff Steel Ingot Label gggg",
+            java.util.Arrays.asList("aaaa bbbb cccc dddd", "eeee ffff", "Steel Ingot Label gggg", "end"),
+            texts);
+        assertEquals(java.util.Arrays.asList(false, true, true, false), r.continued);
+        assertNotNull(find(r.vanillaLines.get(2), "Steel Ingot Label"), "token text must be intact");
+    }
+
+    @Test
+    void wordsMoveWholeAcrossStyles() {
+        // "45s)" is one word in two styles: it moves to the next line whole instead of breaking at the color change
+        MarkupRenderer.Rendered r = renderer(20, 40).render("aaaa bbbb cccc ddd (45s) more");
+        assertEquals(
+            "aaaa bbbb cccc ddd",
             r.vanillaLines.get(0)
                 .getUnformattedText());
-        assertNotNull(find(r.vanillaLines.get(0), "Steel Ingot Label"), "token text must be intact");
         assertEquals(
-            "end",
+            "(45s) more",
             r.vanillaLines.get(1)
                 .getUnformattedText());
     }
 
     @Test
-    void veryLongWordsStayWhole() {
+    void wordsWiderThanALineAreCutAtLineEnds() {
         String word = "x" + new String(new char[45]).replace("\0", "y");
         MarkupRenderer.Rendered r = renderer(20, 40).render(word);
-        assertEquals(1, r.vanillaLines.size());
-        assertEquals(
-            word,
-            r.vanillaLines.get(0)
-                .getUnformattedText());
+        assertEquals(3, r.vanillaLines.size());
+        StringBuilder joined = new StringBuilder();
+        for (IChatComponent c : r.vanillaLines) joined.append(c.getUnformattedText());
+        assertEquals(word, joined.toString());
+        assertEquals(java.util.Arrays.asList(false, true, true), r.continued);
     }
 
     @Test
@@ -316,5 +328,29 @@ class MarkupRendererTest {
         assertNotNull(
             find(line, "Status").getChatStyle()
                 .getChatHoverEvent());
+    }
+
+    @Test
+    void plainTextGetsTierAndNumberHighlights() {
+        IChatComponent line = renderer(320, 10)
+            .render("Cut it in a {m:Cutting Machine} (HV, 480 EU/t) {gold}at 5s{/}").modLines.get(0);
+        assertEquals(
+            EnumChatFormatting.YELLOW,
+            find(line, "HV").getChatStyle()
+                .getColor());
+        assertEquals(
+            EnumChatFormatting.YELLOW,
+            find(line, "480 EU/t").getChatStyle()
+                .getColor());
+        assertEquals(
+            EnumChatFormatting.AQUA,
+            find(line, "Cutting Machine").getChatStyle()
+                .getColor());
+        // Dave's own colors win: no highlight inside {gold}
+        assertEquals(
+            EnumChatFormatting.GOLD,
+            find(line, "at 5s").getChatStyle()
+                .getColor());
+        assertEquals("Cut it in a Cutting Machine (HV, 480 EU/t) at 5s", line.getUnformattedText());
     }
 }

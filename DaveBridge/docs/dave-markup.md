@@ -14,6 +14,20 @@ about 10 lines at once.
 - `# Heading` makes a bold line. `- item` makes a bullet.
 - Write `\{`, `\}`, `\*`, `\\` for literal characters.
 
+## Highlights (make every reply skimmable)
+
+Players skim; a reply in plain white is read word for word or not at all. Give every name its color:
+
+- `{m:Laser Engraver}`: a machine or multiblock, in aqua. Tag every machine you name.
+- Items and fluids show in green. Link them with `{item:}` / `{fluid:}` when you have the id (hover and NEI click come
+  free); otherwise tag the name: `{i:Phosphorus doped Wafer}`. Never leave an ingredient or product as plain text.
+- Automatic, so never color them yourself: voltage tiers (`HV`, `LuV`, ...) in GregTech's tier colors, and numbers
+  with their units (`480 EU/t`, `45s`, `135 L`, `x16`, `2-4`) in yellow. Write them plainly; text inside your own
+  `{color}` spans is not highlighted.
+- `{red}...{/}` only for the one caveat that ruins the build if missed (`{red}needs a cleanroom{/}`).
+
+Example: `- Cut the wafer in a {m:Cutting Machine} (HV, 192 EU/t) with 135 L {i:Lubricant}: 16 {i:NOR Memory Chips}`
+
 ## Links: `{kind:what|label}` (the label is optional)
 
 - `{item:minecraft:iron_ingot}`: the item's name; hover shows its real tooltip; click adds it to the
@@ -41,7 +55,7 @@ about 10 lines at once.
 ## Buttons (put follow-ups at the end of a reply)
 
 - `{send:dave, show the full chain|Full chain}`: an `Ask: [Full chain]` button; the player says that text, so it
-  comes back to you. It must start with `dave,`, `@dave` or `!dave` and be at most 100 characters. Word the label
+  comes back to you. It must start with `dave`, `@dave` or `!dave` and be at most 100 characters. Word the label
   as the follow-up question (`How do I get the wafer?`), not a fragment.
 - `{suggest:dave, why |Why?}`: puts the text into the player's chat line for them to finish.
 - `{cmd:/dave status|Status}`: runs that command. Only allowlisted commands work.

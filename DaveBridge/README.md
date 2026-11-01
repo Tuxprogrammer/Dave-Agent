@@ -3,7 +3,7 @@
 A Forge mod for Minecraft 1.7.10 / GT New Horizons that connects the server to an external AI agent ("Dave").
 
 - **Server half (required on the server):** a local WebSocket the agent connects to, chat triggers
-  (`dave,` `@dave` `!dave`), player join/leave events, Dave's replies as rich chat (item tooltips, NEI bookmark
+  (`dave` `@dave` `!dave`, so `Dave how…` and `dave, …` both work), player join/leave events, Dave's replies as rich chat (item tooltips, NEI bookmark
   and quest links, buttons, rendered per recipient), `/dave status|reload`, and a
   main-thread task queue that later milestones (Groovy eval, introspection, SRG/MCP mapping) build on.
 - **Client half (optional on clients):** a thinking indicator, links that open NEI recipe/usage pages, and an

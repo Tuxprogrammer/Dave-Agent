@@ -29,6 +29,7 @@ import com.tuxprogrammer.davebridge.common.protocol.Thinking;
 import com.tuxprogrammer.davebridge.server.DaveServer;
 import com.tuxprogrammer.davebridge.server.bridge.Protocol;
 import com.tuxprogrammer.davebridge.server.bridge.ProtocolException;
+import com.tuxprogrammer.davebridge.server.chat.markup.FontWidths;
 import com.tuxprogrammer.davebridge.server.chat.markup.MarkupRenderer;
 import com.tuxprogrammer.davebridge.server.chat.markup.MinecraftObjects;
 import com.tuxprogrammer.davebridge.server.chat.markup.ResolvedLink;
@@ -112,7 +113,7 @@ public final class DaveChat {
         if (components != null) {
             rendered = fromComponents(components, warnings);
         } else if (markup != null) {
-            rendered = renderer().render(markup);
+            rendered = renderer(!isEveryone(target)).render(markup);
             warnings.addAll(rendered.warnings);
         } else {
             rendered = plain(text);
@@ -126,9 +127,10 @@ public final class DaveChat {
         List<IChatComponent> modOut = new ArrayList<>();
         List<IChatComponent> vanillaOut = new ArrayList<>();
         for (int i = 0; i < rendered.vanillaLines.size(); i++) {
+            boolean continued = rendered.continued.get(i);
             fitBoth(
-                prefixed(rendered.modLines.get(i), whisper),
-                prefixed(rendered.vanillaLines.get(i), whisper),
+                continued ? indented(rendered.modLines.get(i)) : prefixed(rendered.modLines.get(i), whisper),
+                continued ? indented(rendered.vanillaLines.get(i)) : prefixed(rendered.vanillaLines.get(i), whisper),
                 modOut,
                 vanillaOut,
                 warnings);
@@ -184,24 +186,26 @@ public final class DaveChat {
 
     // ------------------------------------------------------------------ rendering
 
-    static MarkupRenderer renderer() {
+    static MarkupRenderer renderer(boolean whisper) {
         StandardLinkResolver.Options options = new StandardLinkResolver.Options();
         options.urlAllowlist = Config.urlAllowlist;
         options.commandAllowlist = Config.commandAllowlist;
         options.sendPrefixes = Config.triggerPrefixes;
         options.waypoints = Loader.isModLoaded("sharewhereiam");
         options.guides = Loader.isModLoaded("guidenh");
-        int width = Config.maxLineLength - Config.botName.length() - 3;
         return new MarkupRenderer(
             new StandardLinkResolver(options, new MinecraftObjects()),
-            width,
+            Config.chatWidth - prefixWidth(whisper),
+            Config.chatWidth - FontWidths.width(MarkupRenderer.INDENT, false),
             Config.maxLinesPerMessage);
     }
 
     static MarkupRenderer.Rendered plain(String text) {
         List<IChatComponent> lines = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
-        for (String line : ChatText.toLines(text, Config.maxLineLength, Config.maxLinesPerMessage, warnings)) {
+        // plain text: about 6 pixels per character
+        int width = (Config.chatWidth - prefixWidth(false)) / FontWidths.OTHER;
+        for (String line : ChatText.toLines(text, width, Config.maxLinesPerMessage, warnings)) {
             IChatComponent root = new ChatComponentText("");
             root.appendSibling(ForgeHooks.newChatWithLinks(line));
             lines.add(root);
@@ -329,6 +333,18 @@ public final class DaveChat {
      * Public lines start {@code <Dave> }; private ones use vanilla's whisper line ("Dave whispers to you: ", gray
      * italic, translated on the client) with the body left in its own style.
      */
+    /** A continuation line: indented, without the prefix, so a wrapped paragraph reads as one message. */
+    static IChatComponent indented(IChatComponent body) {
+        IChatComponent root = new ChatComponentText(MarkupRenderer.INDENT);
+        root.appendSibling(body);
+        return root;
+    }
+
+    /** Pixel width of the prefix a line Dave started gets ({@link #prefixed}); the whisper one in English. */
+    static int prefixWidth(boolean whisper) {
+        return FontWidths.width(whisper ? Config.botName + " whispers to you: " : "<" + Config.botName + "> ", false);
+    }
+
     static IChatComponent prefixed(IChatComponent body, boolean whisper) {
         IChatComponent name = new ChatComponentText(Config.botName);
         name.setChatStyle(new ChatStyle().setColor(nameColor()));

@@ -31,6 +31,20 @@ import java.util.Set;
  */
 public final class Markup {
 
+    /**
+     * Name highlights: {@code {m:name}} for a machine or multiblock, {@code {i:name}} for an item or fluid named
+     * without
+     * an id. They only color the name; item and fluid links use the same green for common items.
+     */
+    public static final Map<String, String> NAME_COLORS;
+
+    static {
+        Map<String, String> m = new HashMap<>();
+        m.put("m", "aqua");
+        m.put("i", "green");
+        NAME_COLORS = Collections.unmodifiableMap(m);
+    }
+
     /** Token kinds the renderer understands. */
     public static final Set<String> TOKEN_KINDS = Collections.unmodifiableSet(
         new HashSet<>(
@@ -485,6 +499,16 @@ public final class Markup {
                     }
                     warnings.add("unknown color in " + raw);
                     emit(raw);
+                    return;
+                }
+                String nameColor = NAME_COLORS.get(kind);
+                if (nameColor != null) {
+                    // {m:Laser Engraver} / {i:Phosphorus doped Wafer}: just the name in its category's color
+                    int bar = lastUnescaped(body, '|');
+                    String name = unescape(bar < 0 ? body : body.substring(bar + 1)).trim();
+                    tags.add(nameColor);
+                    emit(name.isEmpty() ? raw : name);
+                    tags.remove(tags.size() - 1);
                     return;
                 }
                 if (TOKEN_KINDS.contains(kind)) {

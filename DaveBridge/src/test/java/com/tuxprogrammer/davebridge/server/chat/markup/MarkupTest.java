@@ -225,4 +225,15 @@ class MarkupTest {
         assertTrue(nodes(null).isEmpty());
         assertTrue(nodes("").isEmpty());
     }
+
+    @Test
+    void nameHighlightsColorJustTheName() {
+        assertEquals("aqua", textNode("in a {m:Laser Engraver} now", "Laser Engraver").style.color);
+        assertEquals("green", textNode("takes a {i:Phosphorus doped Wafer}", "Phosphorus").style.color);
+        assertEquals("green", textNode("{i:gregtech:wafer|Wafer}", "Wafer").style.color);
+        assertTrue(textNode("**{m:EBF}**", "EBF").style.bold);
+        assertEquals("in a Laser Engraver now", plain("in a {m:Laser Engraver} now"));
+        // {i} without a colon is still italic
+        assertTrue(textNode("{i}soft{/i}", "soft").style.italic);
+    }
 }

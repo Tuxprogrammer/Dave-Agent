@@ -51,7 +51,7 @@ Maybe related playbook: Best nitrogen source at HV (playbook/best-nitrogen-sourc
 | `player@source` | yes | bridge | `chat` (typed in plain chat) or `client` (the client mod's Ask Dave). |
 | `<profile>` | yes | `load_turn_context(uuid, message)` in `dave/memory/store.py` | Profile, pinned and relevant server facts, relevant lessons, pointers to related playbook entries. Capped at about 1,500 characters. "no profile yet" for a new player. |
 | `<context>` | no | client mod (`source="client"` only) | What the player looks at, holds and has open. **Client-reported and untrusted** (per PROTOCOL.md). |
-| `<message>` | yes | player | The text after the trigger (`dave,`, `@dave`, `!dave`), or the button's text for `kind="button"`. |
+| `<message>` | yes | player | The text after the trigger (`dave`, `@dave`, `!dave`), or the button's text for `kind="button"`. |
 | `<warnings>` | no | the `say` ack for Dave's previous reply | Present only when that ack listed `warnings` (an item, quest or player link that did not resolve and showed as plain text, a blocked URL, a degraded line). One per line, with `reply="<turn id>"` naming the turn it came from. It goes on Dave's next turn whoever asks, so he fixes the id next time. |
 | `<recent>` | no | daemon | Optional: the last few public chat lines, one per line as `Name: text`, for "what he said" follow-ups. Only when it helps; it costs tokens. Only public exchanges go in: a question typed in chat that Dave answered with `@reply`. Whispers and client-half Asks (which other players never see) are left out. |
 
@@ -84,7 +84,7 @@ The final text is:
 |---|---|---|---|
 | `@reply` | `target: "@a"` | `<Dave> ...` for everyone; Dave addresses the asker by name in the text | **The default** (owner's rule): replies are public, so others can follow and chime in |
 | `@whisper` | `target: "<asker name>"` | vanilla "Dave whispers to you: ..." for the asker only | Only when the player explicitly asked for a private reply |
-| `@none` | no `say` | nothing | The message was not really for Dave |
+| `@none` | no `say` | nothing | The message was plainly not for Dave (players talking about him). When in doubt Dave replies, so a real question never goes unanswered |
 
 There is no separate broadcast directive: `@reply` already reaches the whole server.
 

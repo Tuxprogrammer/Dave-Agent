@@ -35,6 +35,9 @@ public final class MinecraftObjects implements StandardLinkResolver.GameObjects 
     /** The client half's command that opens NEI's recipe or usage page (NEI has no native one). */
     public static final String CLIENT_NEI_COMMAND = "/davebridge nei";
 
+    /** Items and fluids in Dave's replies; matches the {@code {i:name}} highlight. */
+    static final EnumChatFormatting ITEM_COLOR = EnumChatFormatting.getValueByName(Markup.NAME_COLORS.get("i"));
+
     // ------------------------------------------------------------------ items
 
     @Override
@@ -89,6 +92,14 @@ public final class MinecraftObjects implements StandardLinkResolver.GameObjects 
         } else {
             c = stack.func_151000_E()
                 .createCopy();
+        }
+        // Common (white) items take the item green, so names stand out from Dave's white text; rarer ones keep their
+        // rarity color.
+        EnumChatFormatting color = c.getChatStyle()
+            .getColor();
+        if (color == null || color == EnumChatFormatting.WHITE) {
+            c.getChatStyle()
+                .setColor(ITEM_COLOR);
         }
         c.setChatStyle(ChatStyles.apply(token.style, c.getChatStyle()));
         return c;
@@ -184,7 +195,7 @@ public final class MinecraftObjects implements StandardLinkResolver.GameObjects 
 
         IChatComponent c = token.label != null && !token.label.isEmpty() ? new ChatComponentText(token.label) : name;
         c.setChatStyle(
-            ChatStyles.apply(token.style, new ChatStyle().setColor(EnumChatFormatting.AQUA))
+            ChatStyles.apply(token.style, new ChatStyle().setColor(ITEM_COLOR))
                 .setChatHoverEvent(ChatStyles.hoverText(hover)));
         return ResolvedLink.same(c);
     }

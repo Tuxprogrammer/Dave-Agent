@@ -46,7 +46,7 @@ public class ServerEventHandler {
             if (event.player == null) {
                 return;
             }
-            String prompt = TriggerMatcher.match(event.message, Config.triggerPrefixes);
+            String prompt = TriggerMatcher.addressed(event.message, Config.triggerPrefixes);
             boolean triggered = prompt != null;
             if (!triggered && !Config.forwardAllChat) {
                 return;
