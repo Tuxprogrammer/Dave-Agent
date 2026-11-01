@@ -223,6 +223,19 @@ public final class GtnhCalcOracleExporter {
                     exportedRecipe.put("durationTicks", Integer.valueOf(Math.max(1, recipe.mDuration)));
                     exportedRecipe.put("eut", Long.valueOf(recipe.mEUt));
                     exportedRecipe.put("specialValue", Integer.valueOf(recipe.mSpecialValue));
+                    // Dave patch: the recipe's own metadata (cleanroom, low_gravity, coil_heat, fusion_threshold,
+                    // ...). In 5.09.54 mSpecialValue is only derived from it, and only when no special value was
+                    // set explicitly, so the metadata is the source of truth.
+                    Map<String, Object> metadata = recipeMetadata(recipe);
+                    if (!metadata.isEmpty()) {
+                        exportedRecipe.put("metadata", metadata);
+                    }
+                    if (recipe.mHidden) {
+                        exportedRecipe.put("hidden", Boolean.TRUE);
+                    }
+                    if (recipe.mFakeRecipe) {
+                        exportedRecipe.put("fake", Boolean.TRUE);
+                    }
                     if ("gt.recipe.fusionreactor".equals(map.unlocalizedName)) {
                         exportedRecipe.put("fusionStartupEu", recipe.getMetadataOrDefault(GTRecipeConstants.FUSION_THRESHOLD, 0L));
                     }
@@ -2435,6 +2448,11 @@ public final class GtnhCalcOracleExporter {
                     catalyst.put("sourceClass", metatileEntity.getClass().getName());
                     catalyst.put("multiblock", Boolean.valueOf(metatileEntity instanceof
                         gregtech.api.metatileentity.implementations.MTEMultiBlockBase));
+                    // Dave patch: a tiered singleblock's voltage tier (MTETieredMachineBlock.mTier).
+                    Number machineTier = asNumber(readField(metatileEntity, "mTier"));
+                    if (machineTier != null) {
+                        catalyst.put("tier", Integer.valueOf(machineTier.intValue()));
+                    }
 
                     List<Map<String, Object>> entries = byRecipeMap.get(recipeMap.unlocalizedName);
                     if (entries == null) {
@@ -3493,6 +3511,41 @@ public final class GtnhCalcOracleExporter {
     private String invokeString(Object target, String methodName) {
         Object value = invokeBest(target, methodName, new Object[0]);
         return value == null ? null : String.valueOf(value);
+    }
+
+    /**
+     * Dave patch: every metadata entry of a GregTech recipe, keyed by the metadata key's identifier. Booleans,
+     * numbers and strings are kept as they are; item and fluid stacks become resources; anything else is written
+     * as its string form, which is enough to tell that the key is set.
+     */
+    private Map<String, Object> recipeMetadata(GTRecipe recipe) {
+        Map<String, Object> out = map();
+        try {
+            for (Map.Entry<?, Object> entry : recipe.getMetadataStorage().getEntries()) {
+                Object key = entry.getKey();
+                Object identifier = readField(key, "identifier");
+                String name = identifier == null ? String.valueOf(key) : String.valueOf(identifier);
+                Object value = entry.getValue();
+                if (value == null) {
+                    continue;
+                }
+                if (value instanceof Boolean || value instanceof Number || value instanceof String) {
+                    out.put(name, value);
+                } else if (value instanceof Enum) {
+                    out.put(name, ((Enum<?>) value).name());
+                } else if (value instanceof ItemStack) {
+                    Map<String, Object> item = itemStack((ItemStack) value);
+                    out.put(name, item == null ? String.valueOf(value) : item);
+                } else if (value instanceof FluidStack) {
+                    Map<String, Object> fluid = fluidStack((FluidStack) value);
+                    out.put(name, fluid == null ? String.valueOf(value) : fluid);
+                } else {
+                    out.put(name, safeString(value));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return out;
     }
 
     private Object readField(Object target, String fieldName) {
