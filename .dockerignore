@@ -4,7 +4,7 @@
 !tools/
 !data/corpus/
 !data/index/
-!data/memory/
+!data/memory/README.md
 !data/recipes.sqlite
 !gtnh-src/
 !DaveBridge/PROTOCOL.md

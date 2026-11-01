@@ -30,15 +30,17 @@ RUN curl -fsSLo /usr/local/bin/supercronic \
  && chmod 755 /usr/local/bin/supercronic
 
 RUN useradd --uid "$DAVE_UID" --user-group --home-dir /dave/home --no-create-home --shell /usr/sbin/nologin dave \
- && mkdir -p /dave/app /dave/ro /dave/seed /dave/home /dave/data /dave/run /dave/work \
- && chown dave:dave /dave /dave/home /dave/data /dave/run /dave/work \
+ && mkdir -p /dave/app /dave/ro /dave/seed/memory /dave/home /dave/data /dave/history /dave/run /dave/work \
+ && chown dave:dave /dave /dave/home /dave/data /dave/history /dave/run /dave/work \
  && chmod 700 /dave/home /dave/run /dave/work
 
 # Read-only data, biggest and least often changed first so code changes rebuild only the small layers.
 COPY --chown=root:root gtnh-src/ /dave/ro/gtnh-src/
 COPY --chown=root:root data/index/ /dave/ro/index/
 COPY --chown=root:root data/corpus/ /dave/ro/corpus/
-COPY --chown=root:root data/memory/ /dave/seed/memory/
+# A blank memory to seed a new server with (only when there is no history to recover from). Real memories never
+# come from the repo: it is public and they hold player data.
+COPY --chown=root:root data/memory/README.md /dave/seed/memory/README.md
 # Recipe database exported from our own pack (tools/recipe-export, tools/recipes/build_db.py).
 COPY --chown=root:root data/recipes.sqlite /dave/ro/recipes.sqlite
 
@@ -60,6 +62,7 @@ ENV DAVE_CONTAINER=1 \
     DAVE_INDEX_DIR=/dave/ro/index \
     DAVE_RECIPES_DB=/dave/ro/recipes.sqlite \
     DAVE_MEMORY_DIR=/dave/data/memory \
+    DAVE_MEMORY_HISTORY=/dave/history/memory.git \
     DAVE_LOG_DIR=/dave/data/logs \
     DAVE_SEARCH_STATE=/dave/data/state \
     DAVE_CLAUDE_HOME=/dave/home \

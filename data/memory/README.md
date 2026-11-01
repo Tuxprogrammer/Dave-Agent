@@ -1,9 +1,10 @@
 # Dave's memories
 
 This folder is Dave's long-term memory. It is written by the `dave-memory` MCP server (`dave/memory/server.py`)
-and, later, the daemon, both through `dave/memory/store.py`. It is **versioned in git on purpose**: memories are
-valuable. In production it is a Docker volume on the game server; see `docs/plans/dave-core.md` for how it gets
-exported back here.
+and, later, the daemon, both through `dave/memory/store.py`. Memories are valuable and hold player data, so
+they are **versioned, but not in this repo** (it is public; only this README is tracked). Their history is a git
+repository of its own (`dave/memory/history.py`): `data/memory-history.git` in dev, the `dave-memory-history`
+volume in production. See `docs/plans/dave-core.md`.
 
 | Path | Holds |
 |---|---|

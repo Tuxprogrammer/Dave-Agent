@@ -21,6 +21,7 @@ ENV = {
     ("paths", "corpus"): "DAVE_CORPUS_DIR",
     ("paths", "index"): "DAVE_INDEX_DIR",
     ("paths", "memory"): "DAVE_MEMORY_DIR",
+    ("paths", "memory_history"): "DAVE_MEMORY_HISTORY",
     ("paths", "queries"): "DAVE_QUERIES_DIR",
     ("paths", "claude_home"): "DAVE_CLAUDE_HOME",
     ("paths", "run"): "DAVE_RUN_DIR",

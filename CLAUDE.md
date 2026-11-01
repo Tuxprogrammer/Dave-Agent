@@ -26,7 +26,8 @@ Dave is an AI chat agent for the owner's **private GT New Horizons 2.9.0 server*
 
 - **Building and shipping.** The image is built from this repo, with private data (gtnh-src, corpus, indexes, recipe DB) baked in read-only, then shipped over the LAN.
 - **Secrets are runtime-only** and never baked into the image: `CLAUDE_CODE_OAUTH_TOKEN`, `OPENROUTER_API_KEY`, the DaveBridge token.
-- **Dave's memory (`data/memory/`) is a persistent volume** on the server, so rebuilding the image never touches it. Production memories need an export path back into this repo.
+- **Dave's memory (`data/memory/`) is a persistent volume** on the server, so rebuilding the image never touches it. Its long-term, versioned history is a git repo on a second volume (`dave-memory-history`, `dave/memory/history.py`).
+- **This repo is public.** Memories hold player data, so they never come back into it (`data/memory/` is git-ignored apart from its README). Never commit hostnames, usernames, home paths, IPs, tokens or player data; real site names live in git-ignored files.
 - **Networking.** Dave reaches DaveBridge over the stack's internal network; the WebSocket port is never published.
 - **Code must not hardcode dev paths.** Locations come from config or env, with defaults that work in this repo.
 

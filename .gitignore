@@ -2,13 +2,16 @@
 data/index/
 data/corpus/wiki/
 
-# Dave core (dave/): secrets and runtime state. data/memory/ is deliberately NOT ignored: memories are versioned.
+# Dave core (dave/): secrets and runtime state.
 dave/.env
 dave/.claude-home/
 dave/.run/
 __pycache__/
-data/memory/.lock
-data/memory/**/.tmp-*
+# Dave's memories hold player data and this repo is public: only the README is tracked. Their versioned history
+# is a git repo of its own (dave/memory/history.py, data/memory-history.git in dev), never this one.
+data/memory/*
+!data/memory/README.md
+data/memory-history.git/
 data/corpus/.wiki.*
 data/wiki-git/
 data/wiki-git.lock

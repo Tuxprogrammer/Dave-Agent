@@ -24,6 +24,7 @@ services:
     secrets: [claude_oauth_token, openrouter_api_key, dave_token]
     volumes:
       - dave-data:/dave/data           # memory, logs, search state and living wiki, memory exports
+      - dave-memory-history:/dave/history  # long-term memory history (git), kept apart from dave-data
       - dave-home:/dave/home           # Claude CLI state and sessions, so --resume survives a restart
     tmpfs:
       - /dave/run:uid=10001,gid=10001,mode=0700
@@ -41,3 +42,4 @@ secrets:
 volumes:
   dave-data:
   dave-home:
+  dave-memory-history:

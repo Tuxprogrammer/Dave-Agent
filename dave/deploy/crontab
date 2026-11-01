@@ -6,6 +6,9 @@
 # it onto the living wiki's `official` branch and merges it into `living` (conflicted pages: Sonnet via claude -p).
 17 5 * * 1 python3 -I /dave/app/tools/gtnh-search/update_wiki.py
 
-# Nightly memory export into the volume, keeping 14. Pull one into the repo with
-#   docker cp gtnh-dave-1:/dave/data/exports/<file> . && tar -xzf <file> -C data/   (then review `git diff`)
+# Memory history: commit the memory folder to the history volume every 10 minutes (nothing when unchanged).
+*/10 * * * * python3 -I /dave/app/dave/memory/history.py snapshot
+
+# Nightly memory tarball into the data volume, keeping 14: a quick restore point next to the history. Exports hold
+# player data: they stay on the server or in a private backup, never in the (public) Dave-Agent repo.
 43 4 * * * python3 -I /dave/app/dave/memory/store.py export /dave/data/exports 14

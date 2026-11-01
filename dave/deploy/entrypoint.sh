@@ -5,12 +5,20 @@ APP=/dave/app
 
 mkdir -p /dave/data/memory /dave/data/logs /dave/data/state /dave/data/exports
 
-# Dave's memory: seeded from the image's copy of data/memory only when the volume has none. After that the
-# volume is the source of truth; a new image never overwrites it.
+# Dave's memory lives on the data volume; its long-term history is a git repo on its own volume (/dave/history,
+# dave/memory/history.py). An empty memory folder is recovered from the history first, and only seeded blank from
+# the image when there is no history. After that the volume is the source of truth; a new image never overwrites it.
+HISTORY="python3 -I $APP/dave/memory/history.py"
+$HISTORY init >/dev/null
 if [ ! -e /dave/data/memory/INDEX.md ]; then
-    cp -a /dave/seed/memory/. /dave/data/memory/
-    echo "entrypoint: seeded memory from the image"
+    if $HISTORY recover; then
+        echo "entrypoint: recovered memory from its history"
+    else
+        cp -a /dave/seed/memory/. /dave/data/memory/
+        echo "entrypoint: seeded a blank memory from the image"
+    fi
 fi
+$HISTORY snapshot "container start" || echo "entrypoint: memory snapshot failed; the history may be behind"
 
 # Search corpus and index: copied into the state volume when it lacks them or holds an older seed. The living
 # wiki in the volume is never replaced (see docs/plans/living-wiki.md).

@@ -701,7 +701,8 @@ def export(store, out_dir, keep=14, now=None):
     """Writes dave-memory-<UTC date>-<last log hash>.tar.gz of the whole folder into out_dir, under the store lock so
     it is consistent, and keeps the newest `keep` exports. Returns the archive path.
 
-    The owner unpacks one over data/memory/ in the repo and reviews `git diff`; see docs/plans/dave-core.md.
+    A quick restore point next to the long-term history (dave/memory/history.py). Exports hold player data: they stay
+    on the server or in a private backup, never in the public Dave-Agent repo. See docs/plans/dave-core.md.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

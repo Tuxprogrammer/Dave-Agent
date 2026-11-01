@@ -287,8 +287,9 @@ repo-root `.dockerignore`.
 | `/dave/app` | Code: `dave/`, `tools/`, `DaveBridge/PROTOCOL.md` and `DaveBridge/docs/dave-markup.md` (the markup include) | Image | (derived from code location) |
 | `/dave/ro/gtnh-src` | Source tree, without `_decompiled/` and the checkouts' `.git` | Image, read-only | `DAVE_GTNH_SRC` |
 | `/dave/ro/corpus`, `/dave/ro/index` | Search seed (corpus, embeddings) | Image, read-only | `DAVE_CORPUS_DIR`, `DAVE_INDEX_DIR`, `GTNH_SEARCH_DATA`, `GTNH_SEARCH_INDEX_DIR` |
-| `/dave/seed/memory` | Copy of `data/memory/`, used only to seed an empty volume | Image | |
+| `/dave/seed/memory` | A blank memory (the README), used only when the volume is empty and there is no history | Image | |
 | `/dave/data` | **Volume `dave-data`**: `memory/`, `logs/`, `state/` (search corpus, index and the living wiki `wiki-git`), `exports/` | Volume: a rebuild never touches it | `DAVE_ROOT`, `DAVE_MEMORY_DIR`, `DAVE_LOG_DIR`, `DAVE_SEARCH_STATE`, `GTNH_SEARCH_STATE` |
+| `/dave/history` | **Volume `dave-memory-history`**: `memory.git`, the long-term memory history (bare git repo) | Volume, kept apart from `dave-data` | `DAVE_MEMORY_HISTORY` |
 | `/dave/home` | **Volume `dave-home`**: `CLAUDE_CONFIG_DIR` and `HOME` (sessions, CLI state) | Volume, so `--resume` survives restarts | `DAVE_CLAUDE_HOME` |
 | `/dave/run` | Rendered prompt, settings, mcp.json, runtime secret file | tmpfs (uid 10001, 0700) | `DAVE_RUN_DIR` |
 | `/dave/work` | Dave's empty cwd | Image (empty dir) | `DAVE_WORKDIR` |
@@ -344,18 +345,24 @@ stack network reach it.
 | `--strict-mcp-config`, `--tools`, `dontAsk`, `--restricted` | Yes | Yes: this is the permission model, not isolation |
 | Dev `.env` fallback | Yes | Disabled automatically |
 
-**Memory backup and export (built 2026-11-01).** Production memories live on the `dave-data` volume, and
-`data/memory/` in git is the long-term record.
+**Memory history and backups.** Production memories live on the `dave-data` volume. Memories hold player data
+and the Dave-Agent repo is public, so they never come back into it; their long-term record is a git repository on a
+volume of its own, `dave-memory-history` (`/dave/history/memory.git`), managed by `dave/memory/history.py`:
 
-- `python3 -I dave/memory/store.py export <dir> [keep]` writes `dave-memory-<UTC time>-<last log hash>.tar.gz`
-  with the whole folder (including `.log.jsonl` and `.objects/`), taken under the store lock so it's consistent,
-  and keeps the newest `keep` (default 14).
-- The container runs it nightly into `/dave/data/exports`.
-- To bring one home: `sudo docker cp gtnh-dave-1:/dave/data/exports/<file> .` on the server, copy it over, then
-  `tar -xzf <file> -C data/` in the repo (the archive's top folder is `memory/`); review `git diff` (it's
-  Markdown) and commit. The log and object store make a bad memory easy to
-  spot and revert.
-- Seeding a fresh server from git is automatic: an empty volume gets the image's copy of `data/memory/`.
+- `snapshot` commits the memory folder (memories, `INDEX.md`, `.log.jsonl`, saved queries; not `.objects/`, `.lock`
+  or temp files) under the store lock. The commit message lists the memory writes since the last snapshot, from
+  `.log.jsonl`. The entrypoint runs it at start and supercronic every 10 minutes; nothing is committed when nothing
+  changed.
+- `log [id] [N]` and `show <rev> [id]` browse it; `restore <id> <rev>` writes an old version back through the store
+  (logged and indexed like any write).
+- `recover`: the entrypoint fills an empty memory folder from the newest snapshot before falling back to a blank
+  seed, so a lost or reset `dave-data` volume comes back from the history.
+- `bundle <file>` writes the whole history to one file (`git clone <file>` reads it) for a backup off the host:
+  `sudo docker exec gtnh-dave-1 python3 -I /dave/app/dave/memory/history.py bundle /dave/history/memory.bundle`,
+  then copy it from the volume to a private place.
+- The nightly `store.py export <dir> [keep]` tarball (newest 14, in `/dave/data/exports`) stays as a quick restore
+  point next to the history. Exports stay on the server or in a private backup, never in this repo.
+- Host snapshots (ZFS) cover both volumes.
 
 **Living wiki backup:** `living_wiki.py export` inside the container writes a git bundle to
 `/dave/data/state/exports/` (see living-wiki.md).

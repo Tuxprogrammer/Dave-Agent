@@ -36,7 +36,10 @@ stale_seconds = 300                        # a question that waited this long wh
 gtnh_src    = "gtnh-src"                   # DAVE_GTNH_SRC     read-only source tree
 corpus      = "data/corpus"                # DAVE_CORPUS_DIR   read-only search corpus
 index       = "data/index"                 # DAVE_INDEX_DIR    search indexes
-memory      = "data/memory"                # DAVE_MEMORY_DIR   Dave's memories (a volume in production)
+memory      = "data/memory"                # DAVE_MEMORY_DIR   Dave's memories (a volume in production; git-ignored here:
+                                           #                   they hold player data and this repo is public)
+memory_history = "data/memory-history.git" # DAVE_MEMORY_HISTORY  versioned memory history, a bare git repo (dave/memory/
+                                           #                   history.py). Production: its own volume, /dave/history/memory.git
 # queries   = "..."                         # DAVE_QUERIES_DIR  saved eval queries. Unset: <memory>/queries, so they live on the
                                            #                   memory volume and are exported with it. Starters: dave/queries/
 claude_home = "dave/.claude-home"          # DAVE_CLAUDE_HOME  CLAUDE_CONFIG_DIR and HOME for Dave's claude (git-ignored)
