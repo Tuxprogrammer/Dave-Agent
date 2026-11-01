@@ -276,37 +276,62 @@ was available.
 
 ## 4. Production: Docker on the game server's stack
 
-Packaging comes after the daemon; this section fixes the shape now so nothing assumes the dev repo.
+**Status: live since 2026-11-01** as the `dave` service in `/opt/gtnh/docker-compose.yaml` on game-host.
+Files: [`dave/deploy/`](../../dave/deploy/) (Dockerfile, entrypoint, crontab, `build.sh`, compose snippet) and the
+repo-root `.dockerignore`.
 
 **Layout in the container:**
 
 | Path | What | Lifetime | Env |
 |---|---|---|---|
-| `/dave/app` | Code: `dave/`, `tools/`, `DaveBridge/PROTOCOL.md` (for the markup include) | Image | (derived from code location) |
-| `/dave/data/ro/gtnh-src` | Source tree | Image, read-only | `DAVE_GTNH_SRC` |
-| `/dave/data/ro/corpus` | Search corpus | Image, read-only | `DAVE_CORPUS_DIR` |
-| `/dave/data/ro/index` | Search indexes | Image, read-only | `DAVE_INDEX_DIR` |
-| `/dave/data/memory` | Dave's memories | **Volume**: a rebuild never touches it | `DAVE_MEMORY_DIR` |
-| `/dave/home` | `CLAUDE_CONFIG_DIR` and `HOME`: sessions, CLI state | Volume (so `--resume` survives restarts) | `DAVE_CLAUDE_HOME` |
-| `/dave/run` | Rendered prompt, settings, mcp.json, runtime secret file | tmpfs | `DAVE_RUN_DIR` |
-| `/dave/data/logs` | Daemon `turns.jsonl` and `daemon.log`, rotated by size (`[logs]` in `config.toml`) | Volume (survives restarts; not RAM) | `DAVE_LOG_DIR` |
+| `/dave/app` | Code: `dave/`, `tools/`, `DaveBridge/PROTOCOL.md` and `DaveBridge/docs/dave-markup.md` (the markup include) | Image | (derived from code location) |
+| `/dave/ro/gtnh-src` | Source tree, without `_decompiled/` and the checkouts' `.git` | Image, read-only | `DAVE_GTNH_SRC` |
+| `/dave/ro/corpus`, `/dave/ro/index` | Search seed (corpus, embeddings) | Image, read-only | `DAVE_CORPUS_DIR`, `DAVE_INDEX_DIR`, `GTNH_SEARCH_DATA`, `GTNH_SEARCH_INDEX_DIR` |
+| `/dave/seed/memory` | Copy of `data/memory/`, used only to seed an empty volume | Image | |
+| `/dave/data` | **Volume `dave-data`**: `memory/`, `logs/`, `state/` (search corpus, index and the living wiki `wiki-git`), `exports/` | Volume: a rebuild never touches it | `DAVE_ROOT`, `DAVE_MEMORY_DIR`, `DAVE_LOG_DIR`, `DAVE_SEARCH_STATE`, `GTNH_SEARCH_STATE` |
+| `/dave/home` | **Volume `dave-home`**: `CLAUDE_CONFIG_DIR` and `HOME` (sessions, CLI state) | Volume, so `--resume` survives restarts | `DAVE_CLAUDE_HOME` |
+| `/dave/run` | Rendered prompt, settings, mcp.json, runtime secret file | tmpfs (uid 10001, 0700) | `DAVE_RUN_DIR` |
 | `/dave/work` | Dave's empty cwd | Image (empty dir) | `DAVE_WORKDIR` |
 
-Plus `DAVE_BRIDGE_URL=ws://gtnh:25580` (the stack's internal network, port not published; see PROTOCOL.md
-section 6) and `DAVE_CONTAINER=1` (also auto-detected from `/.dockerenv` or `/run/.containerenv`).
+The read-only data sits outside `/dave/data` on purpose: a named volume mounted over image content would keep
+serving the first image's copy after every rebuild.
+
+`DAVE_BRIDGE_URL=ws://gtnh_2:25580` (the server's compose service name on the stack network; the port is not
+published) and `DAVE_CONTAINER=1`. The image runs as `dave` (uid 10001) with all capabilities dropped and
+`no-new-privileges`; tini (`init: true`) reaps the claude, MCP and supercronic children.
+
+**Start-up** (`entrypoint.sh`): seed the memory volume if it has no `INDEX.md`; `index.py --seed` (search state and,
+first time only, the living wiki); `main.py --check` (refuses to start with a missing secret or bad isolation);
+supercronic in the background; then the daemon in the foreground.
+
+**Scheduled jobs** (`dave/deploy/crontab`, UTC): the weekly wiki refresh (Monday 05:17) and a nightly memory export
+(04:43).
+
+**Image contents:** python 3.13-slim (pinned by digest), Claude Code 2.1.316 from the official installer (pinned;
+`DISABLE_AUTOUPDATER`, so a new CLI means a rebuild), supercronic (pinned with sha256), git, and the pip
+requirements of `tools/*/requirements.txt` (numpy for gtnh-search). About 2.7 GB, mostly `gtnh-src` and the index.
+
+**Build and ship:** `dave/deploy/build.sh --ship game-host.example.net` builds `dave:<git rev>`, pipes
+`docker save` over SSH into the server's docker and tags it `dave:current` there. Then, on the server:
+`cd /opt/gtnh && sudo docker compose up -d dave`. The compose service has `pull_policy: never`.
 
 **Secrets are runtime-only.** `CLAUDE_CODE_OAUTH_TOKEN`, `OPENROUTER_API_KEY` and the bridge token are never in
-the image or in `config.toml`. `config.secret()` looks in order at:
+the image or in `config.toml`. On the server they are files in `/opt/gtnh/secrets/` (owner uid 10001, mode 0400;
+the directory is root 0700), mounted as compose secrets at `/run/secrets/{claude_oauth_token,openrouter_api_key,
+dave_token}`. `dave_token` holds the same value as `authToken` in gtnh_2's `config/davebridge.cfg`. `config.secret()`
+looks in order at:
 
 1. the env var;
 2. the file named by `NAME_FILE`;
-3. `/run/secrets/<name>` (`claude_oauth_token`, `openrouter_api_key`, `dave_token`; the last matches
-   PROTOCOL.md);
+3. `/run/secrets/<name>`;
 4. outside a container only, the dev `.env` files (`dave/.env`; root `.env` for OpenRouter).
 
 Inside a container the dev fallback is disabled. The OpenRouter key reaches only gtnh-search, as a file path
-(`OPENROUTER_API_KEY_FILE`), never as a value in Claude's environment. If it exists only as an env var,
-`dave_cmd.py` writes it to `/dave/run/secrets/` with mode 0600.
+(`OPENROUTER_API_KEY_FILE`), never as a value in Claude's environment.
+
+**DaveBridge side:** `S:bindAddress=0.0.0.0` in gtnh_2's `config/davebridge.cfg` (applied with `/dave reload`, no
+restart). Checked 2026-11-01: port 25580 refuses connections from the host and the LAN; only containers on the
+stack network reach it.
 
 **Container gives isolation for free, but the dev measures stay.** We also run Dave locally for testing.
 
@@ -315,21 +340,25 @@ Inside a container the dev fallback is disabled. The OpenRouter key reaches only
 | `CLAUDE_CONFIG_DIR` and `HOME` override | Yes: the owner's `~/.claude` is right there | Redundant (own HOME), kept for explicitness |
 | Workdir outside the repo and the owner's home | Yes (see the skills finding) | Redundant (no owner home, no repo CLAUDE.md unless copied in) |
 | Env allowlist | Yes | Yes: the daemon's env holds the bridge token and OpenRouter key |
-| `CLAUDE_CODE_DISABLE_CLAUDE_MDS`, `--setting-sources ""`, agents-md `managed-only` | Yes | Cheap insurance against a stray CLAUDE.md in the image |
+| `CLAUDE_CODE_DISABLE_CLAUDE_MDS`, `--setting-sources ""`, agents-md `managed-only` | Yes | Cheap insurance against a stray CLAUDE.md in the image (`.dockerignore` also drops the upstream checkouts' CLAUDE.md, AGENTS.md and `.claude/`) |
 | `--strict-mcp-config`, `--tools`, `dontAsk`, `--restricted` | Yes | Yes: this is the permission model, not isolation |
 | Dev `.env` fallback | Yes | Disabled automatically |
 
-**Memory backup and export (proposal, not built).** Production memories live on the server's volume, and
-`data/memory/` in git is the long-term record. Proposed:
+**Memory backup and export (built 2026-11-01).** Production memories live on the `dave-data` volume, and
+`data/memory/` in git is the long-term record.
 
-- A `dave memory export` command (a small subcommand of `store.py`) writes
-  `dave-memory-<UTC date>-<last log hash>.tar.gz` with the whole folder (including `.log.jsonl` and `.objects/`),
-  taken under the store lock so it's consistent.
-- A nightly job in the stack (cron in the daemon, or a tiny sidecar) runs it into a second volume or a host
-  bind-mount, keeping the last N.
-- The owner pulls a tarball and unpacks it over `data/memory/` in this repo, reviews `git diff` (it's
-  Markdown), and commits. The log and object store make a bad memory easy to spot and revert.
-- An import in the other direction (seed a fresh server from git) is just copying the folder into the volume.
+- `python3 -I dave/memory/store.py export <dir> [keep]` writes `dave-memory-<UTC time>-<last log hash>.tar.gz`
+  with the whole folder (including `.log.jsonl` and `.objects/`), taken under the store lock so it's consistent,
+  and keeps the newest `keep` (default 14).
+- The container runs it nightly into `/dave/data/exports`.
+- To bring one home: `sudo docker cp gtnh-dave-1:/dave/data/exports/<file> .` on the server, copy it over, then
+  `tar -xzf <file> -C data/` in the repo (the archive's top folder is `memory/`); review `git diff` (it's
+  Markdown) and commit. The log and object store make a bad memory easy to
+  spot and revert.
+- Seeding a fresh server from git is automatic: an empty volume gets the image's copy of `data/memory/`.
+
+**Living wiki backup:** `living_wiki.py export` inside the container writes a git bundle to
+`/dave/data/state/exports/` (see living-wiki.md).
 
 ## 5. Open questions for the owner
 
