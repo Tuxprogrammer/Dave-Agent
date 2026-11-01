@@ -329,8 +329,9 @@ class Builder:
             shapeless = r.get("type") == "shapeless" or "shapeless" in str(r.get("className", "")).lower()
             mid = "crafting.shapeless" if shapeless else "crafting.shaped"
             self.map(mid, "Shapeless Crafting" if shapeless else "Shaped Crafting", "crafting")
-            ins = [self.io_row(x, "in", x.get("slotIndex", i)) for i, x in enumerate(r.get("inputs") or [])
-                   if x.get("kind") != "text"]
+            # a crafting tool (an oredict craftingTool* slot or a GregTech tool) loses durability, it is not used up
+            ins = [self.io_row(x, "in", x.get("slotIndex", i), consumed=not is_tool(x))
+                   for i, x in enumerate(r.get("inputs") or []) if x.get("kind") != "text"]
             extra = {"class": r.get("className")} if r.get("className") and not r.get("className", "").startswith(
                 ("net.minecraft.item.crafting.", "net.minecraftforge.oredict.")) else None
             # a recipe class the exporter cannot read (special IRecipe implementations) comes with no inputs
@@ -377,6 +378,12 @@ class Builder:
                 iid = self.cat.add(st)
                 if iid:
                     self.cat.items[iid]["oredict"].add(name)
+
+
+def is_tool(res):
+    if res.get("kind") == "oreDictionary":
+        return any(str(n).startswith("craftingTool") for n in res.get("names") or [])
+    return str(res.get("id") or "").startswith("gregtech:gt.metatool.")
 
 
 def aggregate(rows, side):

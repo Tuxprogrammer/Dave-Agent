@@ -246,5 +246,122 @@ class ServerTests(SampleDB):
             os.environ.update(old)
 
 
+AIR_CENTRIFUGE = "888ef3a2730adc37"      # Multiblock Centrifuge: 10,000 L Air -> 1,000 L Oxygen + 3,900 L Nitrogen
+VF_LIQUID_AIR = "c0e6c52705f119c6"       # Vacuum Freezer: 2,000 L Air -> 1,000 L Liquid Air, 480 EU/t, 28 ticks
+LIQUID_AIR_CENTRIFUGE = "f356296d18393dac"  # Multiblock Centrifuge: 53,000 L Liquid Air -> 40,000 L Nitrogen + ...
+EBF_STEEL = "4f296063c8aab45b"           # EBF: Cast Iron Dust + 1,000 L Oxygen, circuit 11 -> Steel Ingot, 1000 K
+
+
+def plan(con, **kw):
+    p = planner.Planner(con, **kw)
+    best, second = p.plan()
+    return p, best, second
+
+
+def hashes(res):
+    return {s["recipe"]["hash"] for s in res["steps"]}
+
+
+class PlannerGolden:
+    """Golden chains, checked against our pack's exported recipes. Mixed into a sample-DB and a full-DB class."""
+
+    def test_hv_nitrogen(self):
+        """HV nitrogen: centrifuging free air. 11,200 EU per run / 3.9 buckets = 2,871.8 EU per 1,000 L."""
+        p, best, second = plan(self.con, target="Nitrogen", tier="HV")
+        self.assertEqual(best["main"], AIR_CENTRIFUGE)
+        self.assertAlmostEqual(best["eu_per_unit"] * 1000, 11200 / 3.9, delta=1.0)
+        self.assertEqual([i for i, v, c in best["imports"]], ["fluid:air"])
+        self.assertIsNotNone(second)
+        self.assertNotIn(AIR_CENTRIFUGE, hashes(second))
+        text = p.text(best, second)
+        self.assertIn("RUNNER-UP (without #%s" % AIR_CENTRIFUGE, text)
+
+    def test_vacuum_freezer_lock(self):
+        """'I'm using the Vacuum Freezer route': air -> liquid air in the VF, then liquid air -> nitrogen.
+        1,325 L liquid air per 1,000 L N = 1.325 VF runs (17,808 EU) + 7,420/40 EU of centrifuging = 17,993.5 EU."""
+        # The VF also cools Nitrogen Plasma into Nitrogen, but plasma needs a fusion reactor (LuV+): in the full
+        # pack that import is 'unavailable' at HV and the planner routes around it. The sample has no fusion recipes,
+        # so plasma would read as an ordinary raw resource there; banning it keeps both runs comparable.
+        p, best, _ = plan(self.con, target="Nitrogen", tier="HV", locks=["Vacuum Freezer"],
+                          banned=self.extra_vf_bans)
+        self.assertEqual(hashes(best), {VF_LIQUID_AIR, LIQUID_AIR_CENTRIFUGE})
+        self.assertEqual(best["lock_mode"], "route1")
+        self.assertAlmostEqual(best["eu_per_unit"] * 1000, 1.325 * 13440 + 7420 / 40.0, delta=1.0)
+
+    def test_tier_filter(self):
+        """At LV the HV vacuum freezer recipe is out, so the lock cannot be met."""
+        with self.assertRaises(planner.PlanError):
+            plan(self.con, target="Nitrogen", tier="LV", locks=["Vacuum Freezer"])
+        _, best, _ = plan(self.con, target="Nitrogen", tier="LV")
+        self.assertTrue(all((s["recipe"]["tier"] or 0) <= 1 for s in best["steps"]))
+
+    def test_ban_and_free(self):
+        _, best, _ = plan(self.con, target="Nitrogen", tier="HV", banned=[AIR_CENTRIFUGE])
+        self.assertNotIn(AIR_CENTRIFUGE, hashes(best))
+        _, best, _ = plan(self.con, target="Nitrogen", tier="HV", banned=["Multiblock Centrifuge"])
+        self.assertFalse(any(s["recipe"]["map"] == "gt.recipe.multicentrifuge" for s in best["steps"]))
+
+    def test_ebf_steel_lock_and_heat(self):
+        p, best, _ = plan(self.con, target="Steel Ingot", tier="HV", heat="cupronickel",
+                          locks=["Electric Blast Furnace"])
+        self.assertEqual(p.heat, 1901)
+        made_by = [s["recipe"] for s in best["steps"] if p._makes(s["recipe"]["hash"], STEEL)]
+        self.assertTrue(made_by)
+        self.assertTrue(all(r["map"] == "gt.recipe.blastfurnace" and r["heat"] <= 1901 for r in made_by))
+        self.assertEqual(best["lock_mode"], "direct")
+        # every EBF steel recipe needs at least 1000 K: at 900 K the EBF cannot be the step that makes steel
+        try:
+            p, best, _ = plan(self.con, target="Steel Ingot", tier="HV", heat=900, locks=["Electric Blast Furnace"])
+            self.assertNotEqual(best["lock_mode"], "direct")
+            self.assertFalse(any(s["recipe"]["map"] == "gt.recipe.blastfurnace" and p._makes(s["recipe"]["hash"], STEEL)
+                                 for s in best["steps"]))
+        except planner.PlanError:
+            pass
+
+
+@unittest.skipUnless(HAVE_HIGHS, "highspy is not installed (pip install -r tools/recipes/requirements.txt)")
+class PlannerSampleTests(PlannerGolden, SampleDB):
+    extra_vf_bans = ["Nitrogen Plasma"]
+    def test_errors(self):
+        text, err = planner.plan_chain(self.con, "no such item anywhere")
+        self.assertTrue(err)
+        text, err = planner.plan_chain(self.con, "Nitrogen", locks=["no such machine"])
+        self.assertTrue(err)
+        self.assertIn("lock", text)
+
+    def test_server_plan_chain(self):
+        svc = server.Service(self.db)
+        r = server.handle(svc, {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "plan_chain", "arguments": {"target": "Nitrogen", "tier": "HV"}}})["result"]
+        self.assertFalse(r["isError"], r)
+        self.assertIn("#" + AIR_CENTRIFUGE, r["content"][0]["text"])
+
+
+@unittest.skipUnless(HAVE_HIGHS and FULL_DB.is_file(), "full DB or highspy missing")
+class PlannerFullDBTests(PlannerGolden, unittest.TestCase):
+    """The same golden chains against the whole pack (data/recipes.sqlite): no other route may beat them."""
+    extra_vf_bans = ()
+
+    @classmethod
+    def setUpClass(cls):
+        cls.con = R.connect(FULL_DB)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.con.close()
+
+    def test_ebf_steel_recipe(self):
+        _, best, _ = plan(self.con, target="Steel Ingot", tier="HV", heat="cupronickel",
+                          locks=["Electric Blast Furnace"])
+        self.assertIn(EBF_STEEL, hashes(best))
+
+    def test_nand_chip_producers_hv(self):
+        """The question Dave failed in production: what makes NAND chips, at what EU/t."""
+        rows, total = R.recipes_touching(self.con, NAND, "out", tier=3)
+        cut = [r for r in rows if r["map"] == "gt.recipe.cuttingsaw"]
+        self.assertTrue(cut)
+        self.assertTrue(all(r["eut"] == 480 and r["cleanroom"] and r["circuit"] == 1 for r in cut))
+
+
 if __name__ == "__main__":
     unittest.main()
