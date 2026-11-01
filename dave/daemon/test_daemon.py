@@ -73,7 +73,8 @@ class FakeBridge:
         self.requests, self.ws, self.connections, self.warnings_next = [], None, 0, []
         self.tick = 0
         self.ignore_pings = False              # simulate a half-open connection: pings are never answered
-        self.accepts = ["list_players", "ping", "say", "thinking", "eval", "describe", "client_eval"]
+        self.accepts = ["list_players", "ping", "say", "thinking", "eval", "describe", "client_eval", "lesson",
+                        "lesson_stop"]
 
     async def start(self):
         self.server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
@@ -565,6 +566,20 @@ class BridgeToolTests(DaemonTests.__bases__[0]):
         sent = self.bridge.of("describe")[-1]
         self.assertEqual((sent["target"], sent["x"], sent["player"]), ("block", 1, "Alex"))
 
+    async def test_lesson_tools_default_to_the_asker_and_report_no_client_mod(self):
+        await self.start()
+        self.asking("Alex")
+        ack = await self.call("lesson", lesson={"title": "EBF", "steps": [{"walkTo": [1, 64, 2]}, {"say": "here"}]})
+        self.assertTrue(ack["ok"], ack)
+        self.assertEqual(self.bridge.of("lesson")[-1]["player"], "Alex")
+        self.assertEqual(ack["result"]["steps"], 2)
+        plain = await self.call("lesson", player="Plain", lesson={"steps": [{"say": "x"}]})
+        self.assertFalse(plain["ok"])
+        self.assertIn("no_client_mod", plain["error"])
+        stop = await self.call("lesson_stop")
+        self.assertTrue(stop["ok"], stop)
+        self.assertEqual(self.bridge.of("lesson_stop")[-1]["player"], "Alex")
+
     async def test_queries_save_list_run(self):
         await self.start()
         self.asking("Alex")
@@ -617,7 +632,7 @@ class BridgeToolTests(DaemonTests.__bases__[0]):
             self.assertEqual(init["result"]["serverInfo"]["name"], "bridge")
             tools = {t["name"] for t in (await rpc(2, "tools/list"))["result"]["tools"]}
             self.assertTrue({"eval", "describe", "query_run", "query_save", "query_list", "say",
-                             "list_players"} <= tools)
+                             "list_players", "lesson", "lesson_stop"} <= tools)
             res = await rpc(3, "tools/call", {"name": "eval", "arguments": {"script": "2 * 21"}})
             self.assertFalse(res["result"]["isError"])
             self.assertIn('"script":"2 * 21"', res["result"]["content"][0]["text"])

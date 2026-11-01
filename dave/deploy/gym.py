@@ -40,8 +40,11 @@ CASES = [
     ("query-save", "save the script you used to count overworld entities as a saved query named gym-entity-count", ["query_save"], {}),
     ("query-list", "which saved queries do you have? list their names", ["query_list", "query_run"], {}),
     ("planner", "I'm at HV: what's the best source of nitrogen? plan the chain", ["Agent", "Task", "plan_chain"], {}),
+    ("recipe-planner", "design me an HV factory for 1 stainless steel ingot per second: compare at least two routes "
+     "with machine counts and power, I have plenty of oxygen", ["Agent", "Task"], {}),
     ("memory-save", "remember that my main base is at 1200 70 -800 and I'm at HV", ["player_note", "memory_save"], {}),
-    ("memory-recall", "what do you remember about me?", ["player_get", "memory_recall"], {}),
+    # The asker's profile is already in the turn envelope, so answering from it without a tool is right.
+    ("memory-recall", "what do you remember about me?", [], {"want_any": ["1200"]}),
     ("memory-forget", "forget my base location please", ["player_note", "memory_forget", "memory_update", "memory_correct"], {}),
     ("wiki-read", "what does our server wiki say about the Vacuum Freezer? one line", ["wiki_get", "wiki_search_titles"], {}),
     ("lesson-fallback", "show me in the world where an EBF controller goes (a guided demo)", ["lesson"], {}),

@@ -346,6 +346,88 @@ public final class SrgMetaClass extends DelegatingMetaClass {
         return above != null ? above : Object.class;
     }
 
+    /** How {@link Handle} picks the class to build a metaclass from; replaceable in tests. */
+    static volatile java.util.function.Function<Class<?>, Class<?>> ancestorOf = SrgMetaClass::reflectableAncestor;
+
+    /**
+     * The metaclass of a class whose members can't be listed, built from a reflectable ancestor (see
+     * {@link #reflectableAncestor}). Groovy's MetaClassImpl hands any call on a class object other than its own back to
+     * the registry, which returns this metaclass again: calling {@code getName()} or {@code toString()} on such a class
+     * recursed until the stack overflowed (found live: GT world lookups that touched every loaded tile entity). Calls
+     * with the class itself as receiver are answered here instead: methods and properties of {@code java.lang.Class}
+     * first, then the ancestor's statics.
+     */
+    static final class AncestorMetaClass extends DelegatingMetaClass {
+
+        private final Class<?> registeredFor;
+
+        AncestorMetaClass(MetaClass delegate, Class<?> registeredFor) {
+            super(delegate);
+            this.registeredFor = registeredFor;
+        }
+
+        private static MetaClass classMetaClass() {
+            return GroovySystem.getMetaClassRegistry()
+                .getMetaClass(Class.class);
+        }
+
+        @Override
+        public Object invokeStaticMethod(Object object, String methodName, Object[] arguments) {
+            if (object != registeredFor) {
+                return super.invokeStaticMethod(object, methodName, arguments);
+            }
+            try {
+                return classMetaClass().invokeMethod(Class.class, object, methodName, arguments, false, false);
+            } catch (MissingMethodException e) {
+                if (!methodName.equals(e.getMethod())) {
+                    throw e;
+                }
+                return super.invokeStaticMethod(getAdaptee().getTheClass(), methodName, arguments);
+            }
+        }
+
+        @Override
+        public Object getProperty(Object object, String property) {
+            if (object != registeredFor) {
+                return super.getProperty(object, property);
+            }
+            try {
+                return classMetaClass().getProperty(object, property);
+            } catch (MissingPropertyException e) {
+                if (!property.equals(e.getProperty())) {
+                    throw e;
+                }
+                return super.getProperty(getAdaptee().getTheClass(), property);
+            }
+        }
+
+        @Override
+        public Object getProperty(Class sender, Object receiver, String property, boolean isCallToSuper,
+            boolean fromInsideClass) {
+            if (receiver != registeredFor) {
+                return super.getProperty(sender, receiver, property, isCallToSuper, fromInsideClass);
+            }
+            return getProperty(receiver, property);
+        }
+
+        @Override
+        public Object invokeMethod(Object object, String methodName, Object[] arguments) {
+            if (object != registeredFor) {
+                return super.invokeMethod(object, methodName, arguments);
+            }
+            return invokeStaticMethod(object, methodName, arguments);
+        }
+
+        @Override
+        public Object invokeMethod(Class sender, Object receiver, String methodName, Object[] arguments,
+            boolean isCallToSuper, boolean fromInsideClass) {
+            if (receiver != registeredFor) {
+                return super.invokeMethod(sender, receiver, methodName, arguments, isCallToSuper, fromInsideClass);
+            }
+            return invokeStaticMethod(receiver, methodName, arguments);
+        }
+    }
+
     /** Wraps the metaclasses of Minecraft-hierarchy classes as Groovy creates them. */
     static final class Handle extends MetaClassRegistry.MetaClassCreationHandle {
 
@@ -357,8 +439,11 @@ public final class SrgMetaClass extends DelegatingMetaClass {
 
         @Override
         protected MetaClass createNormalMetaClass(Class theClass, MetaClassRegistry registry) {
-            Class<?> usable = theClass == null ? null : reflectableAncestor(theClass);
+            Class<?> usable = theClass == null ? null : ancestorOf.apply(theClass);
             MetaClass normal = super.createNormalMetaClass(usable, registry);
+            if (theClass != null && usable != theClass) {
+                normal = new AncestorMetaClass(normal, theClass);
+            }
             if (theClass != null && inMinecraftHierarchy(theClass)) {
                 return new SrgMetaClass(normal, names);
             }

@@ -152,6 +152,19 @@ class BridgeRPC:
                                       timeout=30)
         if op == "list_players":
             return await self.request({"type": "list_players"}, timeout=30)
+        if op == "lesson":
+            player = a.get("player") or self.asker()
+            if not player or not isinstance(a.get("lesson"), dict):
+                raise RpcError("lesson needs a player (default: the asker) and a lesson object with steps")
+            return await self.request({"type": "lesson", "player": player, "lesson": a["lesson"]}, timeout=15)
+        if op == "lesson_stop":
+            player = a.get("player") or self.asker()
+            if not player:
+                raise RpcError("lesson_stop needs a player (default: the asker)")
+            msg = {"type": "lesson_stop", "player": player}
+            if a.get("id"):
+                msg["id"] = str(a["id"])
+            return await self.request(msg, timeout=10)
         if op == "query_list":
             return {"queries": [{k: q.get(k) for k in ("name", "description", "mode", "side", "params", "origin")}
                                 for q in self.queries.list()]}

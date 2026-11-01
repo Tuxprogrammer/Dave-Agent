@@ -144,6 +144,32 @@ TOOLS = [
         },
     },
     {
+        "name": "lesson",
+        "description": (
+            "Show the player a guided demonstration in their own world (\"show me\"): a ghost Dave only they can "
+            "see walks the steps, points, holds items and shows ghost blocks with labels, looping until they stop "
+            "it. Data only, no code, so it needs no client-eval opt-in, but it needs the DaveBridge client mod: on "
+            "error no_client_mod, answer in chat instead. Inspect the world first (describe/eval) so positions are "
+            "real. lesson = {\"title\"?, \"loop\"?: true, \"speed\"?: 0.6, \"steps\": [...]}; each step is one "
+            "of {\"walkTo\":[x,y,z]}, {\"lookAt\":[x,y,z]}, {\"hold\":\"modid:name[:meta]\"}, "
+            "{\"highlight\":{\"pos\":[x,y,z],\"color\"?:\"gold\",\"label\"?:\"text\"}}, "
+            "{\"ghost\":{\"pos\":[x,y,z],\"block\":\"modid:name\",\"meta\"?:0,\"facing\"?:\"north\"}}, "
+            "{\"swing\":true}, {\"say\":\"step text\"}, {\"wait\":ticks}. Limits: positions within 32 blocks "
+            "of the player and in loaded chunks, at most 64 steps and 180 s per pass; unknown items or blocks are "
+            "dropped. Read the ack's warnings. The player defaults to the asker."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"player": {"type": "string"}, "lesson": {"type": "object"}},
+            "required": ["lesson"],
+        },
+    },
+    {
+        "name": "lesson_stop",
+        "description": "Stop the player's guided demonstration (the asker by default; id = only that lesson).",
+        "inputSchema": {"type": "object", "properties": {"player": {"type": "string"}, "id": {"type": "string"}}},
+    },
+    {
         "name": "list_players",
         "description": "Who is online: name, UUID, dimension, position, whether they have the client mod.",
         "inputSchema": {"type": "object", "properties": {}},
@@ -151,7 +177,8 @@ TOOLS = [
 ]
 
 OPS = {"eval": "eval", "describe": "describe", "query_run": "query_run", "query_list": "query_list",
-       "query_get": "query_get", "query_save": "query_save", "say": "say", "list_players": "list_players"}
+       "query_get": "query_get", "query_save": "query_save", "say": "say", "list_players": "list_players",
+       "lesson": "lesson", "lesson_stop": "lesson_stop"}
 
 
 def log(msg):

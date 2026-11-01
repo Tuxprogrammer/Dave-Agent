@@ -154,7 +154,7 @@ client eval, so a confirm always goes to the person who asked. Claude may name a
 | `query_save(name, description, script, mode?, side?, params_doc?, replace?)` | Save a script that worked |
 | `say(markup, target="@a")` | Post mid-turn (progress on a long job). Normal replies are the turn's final text |
 | `list_players()` | Who is online |
-| `lesson(player, lesson)` | **Ready on the wire, tool not wired yet.** Show one player a guided demonstration ("show me"); see below |
+| `lesson(player, lesson)` | Show one player a guided demonstration ("show me"); see below |
 | `lesson_stop(player, id?)` | Stop that player's demonstration |
 
 **Saved queries.** Groovy files with a `// @key: value` header (`dave/bridge/queries.py`). Two folders: the
@@ -176,7 +176,7 @@ starter with the server's engine settings on each build.
 Allowed in `launch/settings.json` as `mcp__bridge`. The `recipe-planner` subagent gets `query_run` and
 `query_list` (read lookups such as `gt-recipes`), not raw `eval`.
 
-### `lesson` / `lesson_stop` (guided demonstrations; for whoever wires the `bridge` server)
+### `lesson` / `lesson_stop` (guided demonstrations; wired 2026-11-01)
 
 DaveBridge 0.2.0 handles the `lesson` and `lesson_stop` WebSocket requests and advertises them in `hello.accepts`
 (spec: `DaveBridge/PROTOCOL.md` 1.4 and 2.6; design: `docs/plans/guided-demos.md`). The daemon side exists:

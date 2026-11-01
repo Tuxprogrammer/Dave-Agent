@@ -22,6 +22,8 @@ about 10 lines at once.
 - `{recipe:minecraft:iron_ingot}` / `{uses:minecraft:iron_ingot}`: shows as `Recipe: [Iron Ingot]` /
   `Uses: [Iron Ingot]`; for players with the DaveBridge client mod the click opens the NEI recipe / usage page.
   The type word is added for you, so a label is just the item's name (`|NAND Chip`, not `|NAND chip recipe`).
+  Link the item the recipe makes, with its real id; never use a recipe hash or number as a label. Fluids have no
+  recipe page: use `{fluid:}`.
 - `{fluid:water}`: the fluid's name with a hover (id, temperature).
 - `{chain:minecraft:iron_ingot*4, minecraft:coal*2|Steel kit}`: a `[Steel kit]` button that adds the items with
   amounts to the player's NEI bookmarks as one group.
