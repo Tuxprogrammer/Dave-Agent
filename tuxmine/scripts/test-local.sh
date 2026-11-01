@@ -30,6 +30,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TUXMINE="$(dirname "$HERE")"
 ROOT="$(dirname "$TUXMINE")"
+# The checks expect the example site, whatever the local deploy/secrets say.
+export TUXMINE_PUBLIC_BASE="https://pack.example.net" TUXMINE_SERVER_ADDRESS="example.net:25567"
 WORK="$ROOT/.work/tuxmine"
 T="$WORK/test"
 PORT="${PORT:-18073}"

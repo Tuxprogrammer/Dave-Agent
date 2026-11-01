@@ -1,6 +1,8 @@
 """Live gym: asks the production Dave a fixed set of questions over RCON and checks that each feature was really used.
 
-    python3 -I dave/deploy/gym.py [--host game-host.example.net] [--only NAME,...] [--out report.json]
+    python3 -I dave/deploy/gym.py --host GAME_HOST [--only NAME,...] [--out report.json]
+
+GAME_HOST is the ssh host running the GTNH stack (or set DAVE_GAME_HOST).
 
 How it works (no player needs to be online):
 - Each case is sent with DaveBridge's console hook `/dave ask <asName> [@x,y,z,dim] <question>` through `rcon-cli` in
@@ -15,6 +17,7 @@ Reads nothing secret and prints no tokens. Exit code 0 when every case passed.
 
 import argparse
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -172,7 +175,7 @@ def run_case(live, name, question, tools, opts, pos, sky, qname):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--host", default="game-host.example.net")
+    ap.add_argument("--host", default=os.environ.get("DAVE_GAME_HOST"), required="DAVE_GAME_HOST" not in os.environ)
     ap.add_argument("--only", default="")
     ap.add_argument("--out", default="")
     a = ap.parse_args()

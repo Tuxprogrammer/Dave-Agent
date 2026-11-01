@@ -64,12 +64,22 @@ def pack_token() -> str:
     return token
 
 
-CLIENT_PACK_URL = f"https://pack.example.net/{pack_token()}/client/pack.toml"
+def site(name: str, default: str) -> str:
+    """A site setting: $TUXMINE_<NAME>, else tuxmine/deploy/secrets/<name> (git-ignored), else the example."""
+    value = os.environ.get("TUXMINE_" + name.upper().replace("-", "_"))
+    path = TUXMINE / "deploy/secrets" / name
+    if not value and path.exists():
+        value = path.read_text().strip()
+    return value or default
+
+
+PUBLIC_BASE = site("public-base", "https://pack.example.net").rstrip("/")
+CLIENT_PACK_URL = f"{PUBLIC_BASE}/{pack_token()}/client/pack.toml"
 INSTANCE_NAME = f"tuxmine (GTNH {GTNH_VERSION})"
 ICON_KEY = "tuxmine_dave"
 DAVE_SKIN = ROOT / "DaveBridge/src/main/resources/assets/davebridge/textures/entity/dave.png"
 SERVER_NAME = "tuxmine"
-SERVER_ADDRESS = "example.net:25567"
+SERVER_ADDRESS = site("server-address", "example.net:25567")
 
 # GTNH files the client pack replaces. Missing ones fail the build, so a GTNH bump gets a look.
 REMOVE = [".minecraft/mods/journeymap-1.7.10-5.2.23-fairplay.jar"]

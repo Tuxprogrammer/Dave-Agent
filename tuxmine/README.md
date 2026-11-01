@@ -81,6 +81,7 @@ https://pack.example.net/<token>/                 one-page player instructions (
 ## Access control: secret path and rate limits
 
 Everything is published under a **secret path**: `https://pack.example.net/<token>/`.
+- **Site names** stay out of git too: the scripts read the public pack URL and the game server address from `TUXMINE_PUBLIC_BASE` / `TUXMINE_SERVER_ADDRESS`, else from `deploy/secrets/public-base` and `deploy/secrets/server-address`. Without them they use the `example.net` placeholders shown in these docs.
 - **The token** is a shared secret, not per player. It lives in the git-ignored `deploy/secrets/pack-token` (32 hex characters). Never paste it anywhere public; docs and logs say `<token>`.
 - **Without it**, every path except `/healthz` is a 404, including `/`. Caddy has no `browse`, and nothing is published at the root. The hostname isn't discoverable either: the certificate is `*.example.net` and DNS uses a wildcard.
 - **Where the token is used:**
