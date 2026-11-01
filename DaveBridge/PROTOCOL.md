@@ -39,7 +39,7 @@ On success the server sends:
  "session":3,"botName":"Dave","accepts":["list_players","ping","say","thinking"]}
 ```
 
-`accepts` lists the inbound message types this server handles. Later milestones add types here, so the
+`accepts` lists the inbound message types this server handles. Servers from 0.2.0 add `lesson` and `lesson_stop`. Later milestones add types here, so the
 daemon can feature-detect.
 
 Connections beyond `maxClients` are refused at the handshake.
@@ -108,6 +108,20 @@ that player changes their opt-in mid-session (`client_settings`, section 2.3). T
 
 `clientEvalAllowed` is the player's opt-in (client config, `/davebridge optin|optout`) for milestone 2 client-side
 eval.
+
+#### `lesson_status`
+
+A lesson (section 1.4 `lesson`) ended on the player's client. Relayed from the client half (untrusted, validated:
+unknown states are dropped, unknown reasons become `other`, `id` is cut to 64 characters, at most one per 200 ms).
+
+```json
+{"type":"lesson_status","ts":...,"id":"ebf-muffler","state":"stopped","reason":"walked_away",
+ "player":"Steve","playerUuid":"...","dim":0,"x":...,"y":...,"z":...,"hasClientMod":true}
+```
+
+`state` is `finished` (a non-looping lesson played to the end; `reason` `done`) or `stopped`, with `reason` one of
+`player` (chat button, stop key or `/davebridge stop`), `walked_away`, `dimension`, `replaced` (a newer lesson),
+`agent` (`lesson_stop`), `timeout` (10 minutes of play), `rejected` (the client could not play it) or `other`.
 
 #### `server_stopping`
 
@@ -197,6 +211,84 @@ Answered immediately on the socket thread (not via the queue):
 `{"type":"pong","ts":...,"tick":123456,"queueDepth":0,"reqId":10}`. `tick` is the server tick counter at the
 last tick; if it stops advancing between pings, the server thread is stuck.
 
+#### `lesson`
+
+Shows one player a guided demonstration ("show me"): a ghost Dave, visible only to that player, walks a route,
+looks and points at blocks, holds items, shows ghost blocks and highlighted blocks with labels, then loops until the
+player stops it. Nothing in the world changes. Design: `docs/plans/guided-demos.md` (repository root).
+
+```json
+{"type":"lesson","player":"Steve","reqId":12,"lesson":{
+  "id":"ebf-muffler","title":"EBF muffler hatch","loop":true,"speed":0.6,"steps":[
+    {"walkTo":[102,64,-18]},
+    {"lookAt":[104.5,65,-18.5]},
+    {"hold":"gregtech:gt.metatool.01:22"},
+    {"highlight":{"pos":[104,64,-19],"color":"gold","label":"Controller goes here"}},
+    {"ghost":{"pos":[104,65,-19],"block":"gregtech:gt.blockmachines","meta":1000,"facing":"north"}},
+    {"swing":true},
+    {"say":"Right-click with a screwdriver to set the output side"},
+    {"wait":40}]}}
+```
+
+| Field | Meaning |
+|---|---|
+| `player` | One online player (case-insensitive). `@a` is refused. |
+| `lesson.id` | Optional, 1-64 of `A-Z a-z 0-9 _ . : -`; made up otherwise. Echoed in the ack and in `lesson_status`. |
+| `lesson.title` | Optional, cut to 64 characters; shown in chat and on the HUD. |
+| `lesson.loop` | Default `true`: replay after a 2 s pause until the player stops it. `false`: play once, keep the last frame 5 s. |
+| `lesson.speed` | Walking speed as a multiple of vanilla walking (4.3 blocks/s). Default 0.6, clamped to 0.1..2. |
+| `lesson.steps` | Played in order. Each step is an object with exactly one of the keys below. |
+
+| Step | Argument | Does | Ticks |
+|---|---|---|---|
+| `walkTo` | `[x,y,z]` (feet position) | Walks in a straight line from where he is. Send waypoints (e.g. from vanilla's pathfinder) for a route; the client interpolates between them. | distance / speed |
+| `lookAt` | `[x,y,z]` | Turns head and body to the point and points at it with his right arm. | 15 |
+| `hold` | `"modid:name[:meta]"` (also `@meta`), or `""` / `null` for empty hands | Holds the item. Until the first `hold`, Dave holds GregGuns' Golden Revolver if the player has GregGuns. | 10 |
+| `highlight` | `{"pos":[x,y,z],"color":..,"label":..}` or just `[x,y,z]` | Pulsing colored box on the block (outline visible through walls), label above it; Dave looks and points. `color`: a chat color name (`gold` default, `red`, `green`, `aqua`, ... plus `orange`, `pink`, `cyan`, `lime`, `purple`) or `#rrggbb`. `label` up to 80 characters. | 25 |
+| `ghost` | `{"pos":[x,y,z],"block":"modid:name","meta":0,"facing":"north"}` | Translucent block, drawn by the block's own inventory renderer (for GT machines `meta` is the meta tile entity id, as on the item). `facing` (`north`/`south`/`east`/`west`/`up`/`down`) turns the block's inventory front (south) that way. | 25 |
+| `swing` | `true` | Swings his arm. | 10 |
+| `say` | text, up to 200 characters | Floating line over Dave's head until the next `say` or the end of the pass. | 40..200 (by length) |
+| `wait` | ticks, 1..400 | Pause. | as given |
+
+Highlights and ghost blocks stay up for the rest of the pass and are cleared when it restarts.
+
+Validation (on the server thread):
+- Every position must be within **32 blocks** of where the player stands, in **y 0..255**, in a **loaded chunk**.
+  Highlight and ghost positions are floored to block positions.
+- Items and blocks must exist in the server's registries. `ore:` and numeric ids are not accepted.
+- At most **64 steps**; one pass at most **180 s** (3600 ticks).
+- An invalid or unknown step (or extra keys) is dropped (or ignored) with a warning; the rest still plays. Text loses
+  `§` codes and control characters.
+- Dave appears on the first waypoint if the lesson starts with `walkTo`, otherwise two blocks in front of the player.
+
+Reply:
+
+```json
+{"type":"ack","ok":true,"for":"lesson","id":"ebf-muffler","steps":8,"dropped":1,"passTicks":216,
+ "warnings":["step 9: unknown step teleport, dropped"],"reqId":12}
+```
+
+Errors:
+- `no_client_mod`: the player has no DaveBridge client half that plays lessons (no client half, a client half older
+  than 0.2.0, or another packet protocol). Answer in chat instead. Lessons do **not** need `clientEvalAllowed`:
+  they are data the client draws, never code.
+- `not_found`: the player is offline. `bad_request`: `player` or `lesson` missing, or no step left after
+  validation (the message lists the warnings).
+
+A new lesson replaces the one playing (that one reports `lesson_status` `replaced`). The player stops a lesson with
+the `[Stop]` chat button, the stop key (unbound by default), `/davebridge stop`, by walking more than 48 blocks from
+where the lesson was made, by changing dimension, or after 10 minutes of play; `/davebridge pause` (or `[Pause]`)
+toggles pause.
+
+#### `lesson_stop`
+
+```json
+{"type":"lesson_stop","player":"Steve","id":"ebf-muffler","reqId":13}
+```
+
+Stops the lesson `id` on that player's client (or whatever is playing, without `id`). Reply: `ack`. Errors as for
+`lesson`. The client answers with `lesson_status` (`stopped`, `agent`) if something was playing.
+
 ### 1.5 Dave markup
 
 The full, prompt-ready spec is [docs/dave-markup.md](docs/dave-markup.md). In short:
@@ -276,6 +368,7 @@ text, and chains become a hover list, all with warnings.
 | `unknown_type` | No handler for `type`. |
 | `unauthorized` | Not authenticated (the connection is then closed). |
 | `not_found` | Target player is not online. |
+| `no_client_mod` | `lesson` / `lesson_stop`: the player has no client half that plays lessons. |
 | `queue_full` | The main-thread queue is at `maxQueueDepth`. Retry later. |
 | `cancelled` | The server is stopping: queued actions that had not run yet, and any message received while it stops. Sent before `server_stopping` and the close. |
 | `internal` | A handler threw. Logged on the server; the server itself is unaffected. |
@@ -344,9 +437,13 @@ The client says hello again on every new connection. The server forgets a player
 | `dave_message` | S->C | **Unused since rich chat.** `botName`, `text`, `replyTo`. Dave's replies now arrive as normal chat for everyone; clients still render it if received. |
 | `thinking` | S->C | `botName`, `clear` (bool): show the indicator, or remove it because the answer arrived |
 | `client_eval_request` | S->C | **Reserved (M2).** `id`, `script`, `mode`. Never sent today; the client logs and ignores it. |
+| `lesson` | S->C | A validated lesson (section 2.6): `id`, `title`, `loop`, `speed`, `dim`, `anchor` (x,y,z), `start` (x,y,z), `steps` |
+| `lesson_stop` | S->C | `id` (null or empty: whatever is playing) |
+| `lesson_status` | C->S | `id`, `state` (`finished`/`stopped`), `reason` (see `lesson_status` in 1.3) |
 
 Server-side validation of client packets:
 
+- `lesson_status`: only from players whose client half said hello; relayed as described in 1.3.
 - `client_hello`: only the first one per login counts; version and capability strings are clipped to 64
   characters, at most 32 capabilities. Chat lines use client-command links (`/davebridge nei ...`) only for players
   whose client reported the `nei` capability; everyone else gets the plain-chat formats.
@@ -394,6 +491,21 @@ in-world). An `openGui` field (screen class name) is reserved for that.
   capability when NEI is installed. It only opens GUIs and
   never changes game or client state. Server-rendered links use it for players with the client half (see 1.6).
 - Everything else (styles, NEI bookmarks, quest links, buttons) is plain chat that every client renders.
+
+### 2.6 Lessons on the client half
+
+Client halves from 0.2.0 report the `lesson` capability in `client_hello`; the server sends lessons only to them.
+
+The `lesson` packet carries the steps in normalized form, one object per step: `op` (the step name), `pos`
+(x,y,z), `id` (item or block), `meta`, `facing`, `color` (0xRRGGBB int), `text` (label or line) and `ticks` (the
+step's duration, computed by the server). The client still checks everything again (client-bound packets are decoded
+defensively): unknown ops, positions that are not finite or more than 34 blocks from `anchor`, and steps past
+64 or past a 3600-tick pass are dropped; a lesson with nothing left, or for another dimension, is answered with
+`lesson_status` `rejected`.
+
+The ghost Dave is a client-only object, never an entity in the world: nothing is synced and no other player can see
+it. Labels, the HUD bar (`Title · Step 3/7 · [K] stop`) and the chat line with `[Pause]` / `[Stop]` buttons come from
+the client's lang file, never from the server.
 
 ---
 
@@ -457,6 +569,8 @@ authenticated agents, queue depth and timing, and how many online players have t
 Client half only:
 
 - `/davebridge nei <recipe|uses> <modid:name[:meta]>` (section 2.5), the target of Dave's recipe and usage links.
+- `/davebridge stop`, `/davebridge pause`: stop or pause/resume the lesson playing (section 2.6), the targets of the
+  lesson's chat buttons. The **Stop Dave's demonstration** key (Controls, unbound by default) also stops it.
 - `/davebridge optin`, `/davebridge optout`, `/davebridge status` (also bare `/davebridge`): the client-eval opt-in.
   Saved to `davebridge-client.cfg` and sent to the server at once (`client_settings`). Opting out also turns off
   the reminder.
