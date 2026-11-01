@@ -124,7 +124,7 @@ async def main(a):
         check("long reply acked without warnings", ack.get("type") == "ack" and not ack.get("warnings"), ack)
         width = res.get("width") or 320
         for bot in (plain, mod):
-            lines = [flatten(m) for m in await received(bot, "<Dave> Steel comes")]
+            lines = [flatten(m) for m in await received(bot, "Steel comes from")]
             joined = " ".join(l[len("<Dave> "):] if i == 0 else l.strip() for i, l in enumerate(lines))
             check(f"{bot.name}: a {len(LONG)}-character reply is one <Dave> line plus indented continuations",
                   len(lines) > 1 and lines[0].startswith("<Dave> ")
