@@ -51,8 +51,7 @@ public class ClientEventHandler {
         ClientHello hello = new ClientHello();
         hello.modVersion = Tags.VERSION;
         // "eval": this client can run client_eval_request (only acted on when clientEvalAllowed is true).
-        hello.capabilities = NeiPages.available()
-            ? new String[] { "render", "ask", "context", "lesson", "nei", "eval" }
+        hello.capabilities = NeiPages.available() ? new String[] { "render", "ask", "context", "lesson", "nei", "eval" }
             : new String[] { "render", "ask", "context", "lesson", "eval" };
         hello.clientEvalAllowed = ClientConfig.clientEvalAllowed;
         DaveNetwork.sendToServer(hello);
