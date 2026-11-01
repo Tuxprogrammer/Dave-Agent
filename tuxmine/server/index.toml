@@ -19,8 +19,8 @@ hash = "9105c4e77ba52ec0a9c5e9b234a23ef0a76d3921eddf0a3f6208c53195988497"
 metafile = true
 
 [[files]]
-file = "mods/gregguns-2ea0ea5.jar"
-hash = "4875b4e97cc11cf3ecb114a8d37f4c5d3163acd231eddf0f214e780316a4884a"
+file = "mods/gregguns-e49c0b0.jar"
+hash = "2d70d7fef9bd62321a4ec84d05c6655b19b01b1919ad35d58026d4d1666ca06a"
 
 [[files]]
 file = "mods/journeymap-unlimited.pw.toml"

@@ -155,7 +155,7 @@ sudo docker run --rm -it --name packtest \
 Expect:
 
 - `Running packwiz installer against URL: http://caddy:8073/<token>/server/pack.toml`, then the generic pack.
-- `~/packtest-data/mods/` has `davebridge-*.jar`, `gregguns-2ea0ea5.jar`, `DiscordIntegrationUnoffical-…jar` and `journeymap-1.7.10-5.2.23-unlimited.jar` exactly once, next to GTNH's mods.
+- `~/packtest-data/mods/` has `davebridge-*.jar`, `gregguns-*.jar`, `DiscordIntegrationUnoffical-…jar` and `journeymap-1.7.10-5.2.23-unlimited.jar` exactly once, next to GTNH's mods.
 - The server reaches "Done". Join it on port 25592 with an instance imported from the zip.
 - Stop it with Ctrl-C, run it again, and the log says `Modpack is already up to date!`.
 
@@ -170,7 +170,7 @@ Edit `gtnh_2` in `docker-compose.yaml` as in the snippet:
   - Don't leave it as `MODS: ""`. An empty-but-set `MODS` makes itzg's `mcopy` clean up the jars it installed before. Those have the same file names packwiz just installed, so DiscordIntegration and JourneyMap would be deleted until the next restart.
   - A removed `MODS` is never looked at. packwiz adopts the existing identical jars ("already exists (validated)"), so there is one copy of each.
 - **Add** `depends_on: caddy: condition: service_healthy`.
-- GregGuns ships through the server pack (`gregguns-2ea0ea5.jar`). If the hand-placed jar in `/data/mods` has a different name by then, delete it in the same window.
+- GregGuns ships through the server pack (`gregguns-<commit>.jar`). If the hand-placed jar in `/data/mods` has a different name by then, delete it in the same window.
 
 Then:
 

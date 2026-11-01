@@ -46,6 +46,7 @@ INSTALLER_SHA256="c9f646908d340d84773948a9a7d98bc1dae250d35e1016dc6e2b8459760b55
 TOKEN_FILE="$TUXMINE/deploy/secrets/pack-token"
 # The DaveBridge jar the packs ship now; the update step replaces it with a fake davebridge-9.9.9-test.jar.
 DB="$(basename "$(ls "$TUXMINE"/client/mods/davebridge-*.jar | head -n1)")"
+GG="$(basename "$(ls "$TUXMINE"/client/mods/gregguns-*.jar | head -n1)")"
 TOK="${TUXMINE_PACK_TOKEN:-$(cat "$TOKEN_FILE" 2>/dev/null || true)}"
 [[ "$TOK" =~ ^[A-Za-z0-9]{24,}$ ]] || { echo "no pack token in $TOKEN_FILE" >&2; exit 1; }
 export TUXMINE_PACK_TOKEN="$TOK"   # compose interpolation in step 6, as /opt/gtnh/.env does live
@@ -212,7 +213,7 @@ run_server initial
 expect_file "$T/server-data" mods/$DB server
 expect_file "$T/server-data" mods/DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar server
 expect_file "$T/server-data" mods/journeymap-1.7.10-5.2.23-unlimited.jar server
-expect_file "$T/server-data" mods/gregguns-2ea0ea5.jar server
+expect_file "$T/server-data" mods/$GG server
 expect_file "$T/server-data" mods/fortunateone-v1.1.10.jar server
 expect_file "$T/server-data" mods/worldedit-v0.0.9.jar server
 expect_file "$T/server-data" config/fortunateone.cfg server
@@ -240,7 +241,7 @@ ls "$MC/mods" | sort > "$T/logs/gtnh-mods-before.txt"
 snapshot "$MC/mods" > "$T/logs/gtnh-mods-snap-before.txt"
 run_client initial
 expect_file "$MC" mods/$DB client
-expect_file "$MC" mods/gregguns-2ea0ea5.jar client
+expect_file "$MC" mods/$GG client
 expect_file "$MC" mods/journeymap-1.7.10-5.2.23-unlimited.jar client
 expect_file "$MC" mods/fortunateone-v1.1.10.jar client
 expect_file "$MC" mods/worldedit-v0.0.9.jar client
@@ -250,7 +251,7 @@ expect_file "$MC" config/fortunateone.cfg client
 expect_absent "$MC" mods/DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar
 added="$(comm -13 "$T/logs/gtnh-mods-before.txt" <(ls "$MC/mods" | sort) | tr '\n' ' ')"
 removed="$(comm -23 "$T/logs/gtnh-mods-before.txt" <(ls "$MC/mods" | sort) | tr '\n' ' ')"
-want_added="$(printf '%s\n' $DB gregguns-2ea0ea5.jar fortunateone-v1.1.10.jar worldedit-v0.0.9.jar \
+want_added="$(printf '%s\n' $DB $GG fortunateone-v1.1.10.jar worldedit-v0.0.9.jar \
   WorldEditCuiFe-v1.0.7-mf-1.7.10-10.13.4.1566.jar journeymap-1.7.10-5.2.23-unlimited.jar | sort | tr '\n' ' ')"
 [[ "$added" == "$want_added" && -z "$removed" ]] || fail "client mods changed beyond the pack's: +[$added] -[$removed]"
 ok "client: GTNH's $(wc -l < "$T/logs/gtnh-mods-before.txt") mods untouched, only the pack's 6 jars added"
@@ -299,10 +300,10 @@ for s in '{"discord": {"token": "MTAxMjM0NTY3ODkw.Gabcde.fghijklmnopqrstuv"}}' '
   expect_refusal "a secret-looking value (${s%%[:=]*}...)" "looks like it contains a secret" publish_to_srv
 done
 rm "$T/packs/client/config/tuxmine-secret-test.json"
-cp "$T/packs/client/mods/gregguns-2ea0ea5.jar" "$T/gregguns.orig"
-newjar "$T/gregguns.orig" "$T/packs/client/mods/gregguns-2ea0ea5.jar"; refresh client
+cp "$T/packs/client/mods/$GG" "$T/gregguns.orig"
+newjar "$T/gregguns.orig" "$T/packs/client/mods/$GG"; refresh client
 expect_refusal "a jar changed under its published file name" "same name with different content" publish_to_srv
-cp "$T/gregguns.orig" "$T/packs/client/mods/gregguns-2ea0ea5.jar"; rm "$T/gregguns.orig"; refresh client
+cp "$T/gregguns.orig" "$T/packs/client/mods/$GG"; rm "$T/gregguns.orig"; refresh client
 python3 -I - "$T/tuxmine-0.0.0-othertoken.zip" <<'PY'
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1], "w") as z:
@@ -349,7 +350,7 @@ expect_file "$T/server-data" mods/DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8
 expect_file "$T/server-data" mods/davebridge-9.9.9-test.jar server
 expect_absent "$MC" config/tuxmine-test.cfg
 expect_file "$MC" mods/davebridge-9.9.9-test.jar client
-ours='davebridge|gregguns-2ea0ea5|fortunateone|worldedit-v0.0.9|WorldEditCuiFe|journeymap-1.7.10-5.2.23-unlimited'
+ours='davebridge|gregguns|fortunateone|worldedit-v0.0.9|WorldEditCuiFe|journeymap-1.7.10-5.2.23-unlimited'
 [[ "$(snapshot "$MC/mods" | grep -vE "$ours")" == "$(grep -vE "$ours" "$T/logs/gtnh-mods-snap-before.txt")" ]] \
   || fail "GTNH's own client mods changed during the test"
 ok "client: GTNH's own mods byte-for-byte untouched across all syncs"
