@@ -50,8 +50,8 @@ public class ClientEventHandler {
         ClientState.reset();
         ClientHello hello = new ClientHello();
         hello.modVersion = Tags.VERSION;
-        hello.capabilities = NeiPages.available() ? new String[] { "render", "ask", "context", "nei" }
-            : new String[] { "render", "ask", "context" };
+        hello.capabilities = NeiPages.available() ? new String[] { "render", "ask", "context", "lesson", "nei" }
+            : new String[] { "render", "ask", "context", "lesson" };
         hello.clientEvalAllowed = ClientConfig.clientEvalAllowed;
         DaveNetwork.sendToServer(hello);
     }

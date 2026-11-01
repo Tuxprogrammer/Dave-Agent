@@ -14,6 +14,7 @@ import net.minecraft.util.ChatStyle;
 import net.minecraft.util.EnumChatFormatting;
 
 import com.tuxprogrammer.davebridge.client.compat.NeiPages;
+import com.tuxprogrammer.davebridge.client.lesson.LessonCommands;
 
 import cpw.mods.fml.common.registry.GameData;
 
@@ -35,7 +36,7 @@ public class ClientCommandDaveBridge extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/davebridge <optin|optout|status> | /davebridge nei <recipe|uses> <modid:name[:meta]>";
+        return "/davebridge <optin|optout|status|stop|pause> | /davebridge nei <recipe|uses> <modid:name[:meta]>";
     }
 
     @Override
@@ -51,6 +52,9 @@ public class ClientCommandDaveBridge extends CommandBase {
     @Override
     public void processCommand(ICommandSender sender, String[] args) {
         String sub = args.length == 0 ? "status" : args[0].toLowerCase();
+        if (args.length == 1 && LessonCommands.handle(sub, sender)) {
+            return; // stop / pause a guided demonstration
+        }
         if (args.length <= 1 && ("optin".equals(sub) || "optout".equals(sub) || "status".equals(sub))) {
             if (!"status".equals(sub)) {
                 OptIn.set("optin".equals(sub));
@@ -112,7 +116,8 @@ public class ClientCommandDaveBridge extends CommandBase {
 
     @Override
     public List<String> addTabCompletionOptions(ICommandSender sender, String[] args) {
-        if (args.length == 1) return getListOfStringsMatchingLastWord(args, "optin", "optout", "status", "nei");
+        if (args.length == 1)
+            return getListOfStringsMatchingLastWord(args, "optin", "optout", "status", "nei", "stop", "pause");
         if (args.length == 2 && "nei".equalsIgnoreCase(args[0]))
             return getListOfStringsMatchingLastWord(args, "recipe", "uses");
         return null;
