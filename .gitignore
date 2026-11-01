@@ -32,3 +32,6 @@ gtnh-src/*
 !gtnh-src/INDEX.md
 !gtnh-src/SOURCE-INDEX.md
 !gtnh-src/source-index.json
+
+# Agent worktrees
+.claude/worktrees/
