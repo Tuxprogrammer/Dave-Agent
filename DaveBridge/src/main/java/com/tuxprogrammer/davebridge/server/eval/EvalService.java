@@ -88,6 +88,7 @@ public final class EvalService {
         EvalHelpers.registerAdapters();
         router.register("eval", request -> handleEval(router, request));
         router.register("describe", request -> handleDescribe(router, request));
+        ClientEvalRelay.register(router);
     }
 
     // ------------------------------------------------------------------ eval
@@ -303,7 +304,18 @@ public final class EvalService {
     }
 
     /** Marker: the request is answered later. */
-    private static final JsonObject PENDING = new JsonObject();
+    static final JsonObject PENDING = new JsonObject();
+
+    /** Runs {@code task} later on the eval timer thread (it must queue any game work itself). */
+    static void schedule(Runnable task, long delay, TimeUnit unit) {
+        TIMER.schedule(() -> {
+            try {
+                task.run();
+            } catch (Throwable t) {
+                DaveBridge.LOG.warn("eval timer task failed", t);
+            }
+        }, delay, unit);
+    }
 
     private static IChatComponent confirmLine1(String summary, String script) {
         IChatComponent line = new ChatComponentText("[" + Config.botName + "] ");
@@ -452,6 +464,7 @@ public final class EvalService {
 
     /** Server stopping: answers every waiting confirm. */
     public static void serverStopping() {
+        ClientEvalRelay.serverStopping();
         for (PendingConfirms.Pending<WriteJob> p : CONFIRMS.clear()) {
             p.payload.request.error(Protocol.ERR_CANCELLED, "server stopping before the confirm");
         }

@@ -28,6 +28,7 @@ import com.tuxprogrammer.davebridge.server.bridge.Protocol;
 import com.tuxprogrammer.davebridge.server.chat.ChatRelay;
 import com.tuxprogrammer.davebridge.server.chat.DaveChat;
 import com.tuxprogrammer.davebridge.server.chat.TriggerMatcher;
+import com.tuxprogrammer.davebridge.server.eval.ClientEvalRelay;
 
 /**
  * Server handlers for packets from the client half. Thread-agnostic (FML may call them off the server thread); clients
@@ -48,10 +49,8 @@ public final class ServerPacketHandlers {
         DaveNetwork.onServer(ClientHello.class, ServerPacketHandlers::onClientHello);
         DaveNetwork.onServer(Ask.class, ServerPacketHandlers::onAsk);
         DaveNetwork.onServer(ClientSettings.class, ServerPacketHandlers::onClientSettings);
-        DaveNetwork.onServer(ClientEvalResult.class, (packet, player) -> {
-            // Reserved for milestone 2: the server never sends ClientEvalRequest yet, so any result is unsolicited.
-            DaveBridge.LOG.debug("Ignoring unsolicited client_eval_result from {}", player.getCommandSenderName());
-        });
+        // Relayed to the agent only if it answers a client_eval this server sent to this player (ClientEvalRelay).
+        DaveNetwork.onServer(ClientEvalResult.class, ClientEvalRelay::onResult);
     }
 
     /**

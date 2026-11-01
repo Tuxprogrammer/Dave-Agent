@@ -72,10 +72,8 @@ public class ClientProxy extends CommonProxy {
                 DaveChatRenderer.showThinking(packet.botName);
             }
         }));
-        DaveNetwork.onClient(ClientEvalRequest.class, packet -> {
-            // Reserved for milestone 2. Never executed in milestone 1, whatever clientEvalAllowed says.
-            DaveBridge.LOG.warn("Ignoring client_eval_request {}: client eval is not implemented", packet.id);
-        });
+        // Runs only if this player opted in (ClientEval re-checks ClientConfig.clientEvalAllowed itself).
+        DaveNetwork.onClient(ClientEvalRequest.class, ClientEval::onRequest);
 
         FMLCommonHandler.instance()
             .bus()

@@ -84,6 +84,7 @@ public class ServerEventHandler {
                 }
                 DaveServer.CLIENTS.remove(id);
                 DaveNetwork.forgetPlayer(id);
+                com.tuxprogrammer.davebridge.server.eval.ClientEvalRelay.playerLeft(id);
             }
         } catch (Throwable t) {
             DaveBridge.LOG.warn("Failed to forward player leave", t);

@@ -462,7 +462,7 @@ The client says hello again on every new connection. The server forgets a player
 
 | Kind | Direction | Fields |
 |---|---|---|
-| `client_hello` | C->S | `modVersion`, `protocol`, `capabilities` (string[], e.g. `render`, `ask`, `context`, `nei`), `clientEvalAllowed` (bool) |
+| `client_hello` | C->S | `modVersion`, `protocol`, `capabilities` (string[], e.g. `render`, `ask`, `context`, `nei`, and `eval` from 0.2.0: can run `client_eval_request`), `clientEvalAllowed` (bool) |
 | `ask` | C->S | `text` (string), `context` (object) |
 | `client_settings` | C->S | `clientEvalAllowed` (bool): the player changed their opt-in mid-session |
 | `client_eval_result` | C->S | `id`, `ok`, `result` (any JSON), `error`, `errorType`, `output`, `ms`, `truncated`: the outcome of a `client_eval_request` (section 1.8). Results the server did not ask for are dropped. |
