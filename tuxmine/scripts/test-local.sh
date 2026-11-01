@@ -30,8 +30,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TUXMINE="$(dirname "$HERE")"
 ROOT="$(dirname "$TUXMINE")"
-# The checks expect the example site, whatever the local deploy/secrets say.
-export TUXMINE_PUBLIC_BASE="https://pack.example.net" TUXMINE_SERVER_ADDRESS="example.net:25567"
+# The public pack URL the built zip should carry: the same site setting publish.sh and build-instance.py read.
+PUBLIC_BASE="${TUXMINE_PUBLIC_BASE:-$(cat "$TUXMINE/deploy/secrets/public-base" 2>/dev/null || true)}"
+PUBLIC_BASE="${PUBLIC_BASE:-https://pack.example.net}"
+PUBLIC_BASE="${PUBLIC_BASE%/}"
 WORK="$ROOT/.work/tuxmine"
 T="$WORK/test"
 PORT="${PORT:-18073}"
@@ -230,7 +232,7 @@ INST="$(dirname "$(find "$T/instance" -maxdepth 2 -name instance.cfg | head -n1)
 MC="$INST/.minecraft"
 grep -qx 'OverrideCommands=true' "$INST/instance.cfg" || fail "OverrideCommands not set"
 pre="$(grep '^PreLaunchCommand=' "$INST/instance.cfg")"
-[[ "$pre" == 'PreLaunchCommand=\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar https://pack.example.net/'"$TOK"'/client/pack.toml' ]] || fail "PreLaunchCommand: $(mask <<<"$pre")"
+[[ "$pre" == 'PreLaunchCommand=\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar '"$PUBLIC_BASE/$TOK"'/client/pack.toml' ]] || fail "PreLaunchCommand: $(mask <<<"$pre")"
 ok "instance.cfg: PreLaunchCommand uses the token URL"
 [[ -f "$MC/packwiz-installer-bootstrap.jar" ]] || fail "bootstrap jar missing"; ok "instance: .minecraft/packwiz-installer-bootstrap.jar"
 expect_absent "$MC" mods/journeymap-1.7.10-5.2.23-fairplay.jar
