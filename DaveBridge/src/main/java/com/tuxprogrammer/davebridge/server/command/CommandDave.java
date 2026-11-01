@@ -16,8 +16,13 @@ import com.tuxprogrammer.davebridge.common.tasks.MainThreadQueue;
 import com.tuxprogrammer.davebridge.server.DaveServer;
 import com.tuxprogrammer.davebridge.server.bridge.BridgeService;
 import com.tuxprogrammer.davebridge.server.bridge.ClientSession;
+import com.tuxprogrammer.davebridge.server.eval.EvalService;
 
-/** {@code /dave status} and {@code /dave reload}. Ops only (permission level 3). */
+/**
+ * {@code /dave status} and {@code /dave reload} (ops only, permission level 3), and {@code /dave confirm|cancel <id>},
+ * the targets of the Confirm and Cancel buttons for world-changing scripts, which any player may run (only the asked
+ * player's click counts; see {@code EvalService}).
+ */
 public class CommandDave extends CommandBase {
 
     @Override
@@ -27,7 +32,13 @@ public class CommandDave extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/dave <status|reload>";
+        return "/dave <status|reload|pending|ask <asName> [@x,y,z,dim] <question>|confirm <id>|cancel <id>>";
+    }
+
+    /** Everyone may run the command; status and reload check for op level 3 themselves. */
+    @Override
+    public boolean canCommandSenderUseCommand(ICommandSender sender) {
+        return true;
     }
 
     @Override
@@ -38,6 +49,16 @@ public class CommandDave extends CommandBase {
     @Override
     public void processCommand(ICommandSender sender, String[] args) {
         String sub = args.length == 0 ? "status" : args[0];
+        if ("confirm".equalsIgnoreCase(sub) || "cancel".equalsIgnoreCase(sub)) {
+            if (args.length < 2) {
+                throw new WrongUsageException("/dave " + sub.toLowerCase(java.util.Locale.ROOT) + " <id>");
+            }
+            sender.addChatMessage(EvalService.onConfirmCommand(sender, args[1], "confirm".equalsIgnoreCase(sub)));
+            return;
+        }
+        if (!sender.canCommandSenderUseCommand(getRequiredPermissionLevel(), getCommandName())) {
+            throw new net.minecraft.command.CommandException("commands.generic.permission");
+        }
         if ("status".equalsIgnoreCase(sub)) {
             status(sender);
         } else if ("reload".equalsIgnoreCase(sub)) {
@@ -50,6 +71,23 @@ public class CommandDave extends CommandBase {
                     EnumChatFormatting.RED);
             }
             status(sender);
+        } else if ("ask".equalsIgnoreCase(sub)) {
+            TestHooks.Ask ask = TestHooks.parseAsk(args, 1);
+            if (ask == null) {
+                throw new WrongUsageException("/dave ask <asName> [@x,y,z[,dim]] <question...>");
+            }
+            int agents = TestHooks.sendAsk(ask);
+            send(
+                sender,
+                agents == 0 ? "No agent is connected; nothing was sent."
+                    : "Sent to " + agents + " agent(s) as " + ask.name + ": " + ask.question,
+                agents == 0 ? EnumChatFormatting.RED : EnumChatFormatting.GRAY);
+        } else if ("pending".equalsIgnoreCase(sub)) {
+            java.util.List<String> lines = EvalService.describePending();
+            send(sender, lines.size() + " change(s) waiting for a confirm", EnumChatFormatting.AQUA);
+            for (String line : lines) {
+                send(sender, " " + line, null);
+            }
         } else {
             throw new WrongUsageException(getCommandUsage(sender));
         }
@@ -89,6 +127,7 @@ public class CommandDave extends CommandBase {
                 queue.lastDrainNanos() / 1_000_000.0),
             null);
         send(sender, " Players with the client mod: " + DaveServer.CLIENTS.count(), null);
+        send(sender, " Changes waiting for a confirm: " + EvalService.pendingConfirms(), null);
     }
 
     private static void send(ICommandSender sender, String text, EnumChatFormatting color) {
@@ -101,6 +140,6 @@ public class CommandDave extends CommandBase {
 
     @Override
     public List<String> addTabCompletionOptions(ICommandSender sender, String[] args) {
-        return args.length == 1 ? getListOfStringsMatchingLastWord(args, "status", "reload") : null;
+        return args.length == 1 ? getListOfStringsMatchingLastWord(args, "status", "reload", "pending", "ask") : null;
     }
 }

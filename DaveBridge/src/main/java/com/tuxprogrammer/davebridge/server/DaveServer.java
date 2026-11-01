@@ -9,6 +9,7 @@ import com.tuxprogrammer.davebridge.common.tasks.MainThreadQueue;
 import com.tuxprogrammer.davebridge.server.bridge.BridgeService;
 import com.tuxprogrammer.davebridge.server.chat.ChatHandlers;
 import com.tuxprogrammer.davebridge.server.command.CommandDave;
+import com.tuxprogrammer.davebridge.server.eval.EvalService;
 import com.tuxprogrammer.davebridge.server.lesson.LessonService;
 import com.tuxprogrammer.davebridge.server.network.ServerPacketHandlers;
 
@@ -36,6 +37,7 @@ public final class DaveServer {
     public static void init() {
         QUEUE.setMaxDepth(Config.maxQueueDepth);
         ChatHandlers.register(BRIDGE.router());
+        EvalService.register(BRIDGE.router());
         ServerPacketHandlers.register();
         LessonService.register(BRIDGE.router());
 
@@ -75,6 +77,7 @@ public final class DaveServer {
     }
 
     public static void serverStopping() {
+        EvalService.serverStopping();
         shutdownBridge();
         CLIENTS.clear();
     }

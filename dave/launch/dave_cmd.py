@@ -181,6 +181,7 @@ def build(cfg=None, mode="stream", prompt=None, write=True, resume=None):
         "MEMORY": paths["memory"], "PACK": cfg["pack"]["version"], "OPENROUTER_KEY_FILE": key_file or "",
         "SEARCH_STATE": cfg["search"]["state"],
         "RECIPES": paths.get("recipes") or cfg["root"] / "data" / "recipes.sqlite",
+        "BRIDGE_SOCKET": config.bridge_socket(cfg),      # the daemon's RPC socket (dave/daemon/rpc.py)
         "PLANNER_MODEL": cfg["model"]["planner"],
         "PLANNER_PROMPT": strip_comments(Path(cfg["prompt"]["planner"]).read_text(encoding="utf-8")),
     }

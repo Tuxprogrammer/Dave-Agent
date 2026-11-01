@@ -13,6 +13,7 @@
       "mcp__gtnh-search",
       "mcp__living-wiki",
       "mcp__recipes",
+      "mcp__bridge",
       "Agent(recipe-planner)", "Task(recipe-planner)"
     ],
     "deny": [

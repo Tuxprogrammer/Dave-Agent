@@ -489,6 +489,60 @@ async def main(a):
           line is not None and "clickEvent" not in json.dumps(json.loads(line))
           and any("/op" in w for w in r.get("warnings", [])), [r, line])
 
+    # ---- client eval (M2): relayed only to opted-in clients that report the "eval" capability
+    if a.client_eval:
+        r = await request({"type": "client_eval", "player": "ModBot", "script": "1", "reqId": "ce0"})
+        check("client_eval: refused for a client that did not opt in",
+              r.get("type") == "error" and r.get("code") == "not_opted_in", r)
+        r = await request({"type": "client_eval", "player": "PlainBot", "script": "1", "reqId": "ce1"})
+        check("client_eval: refused for a player without the client half",
+              r.get("type") == "error" and r.get("code") == "not_opted_in", r)
+        await mod.send_dave("client_settings", {"clientEvalAllowed": True})
+        await next_event(lambda m: m.get("type") == "client_mod" and m.get("clientEvalAllowed") is True)
+        r = await request({"type": "client_eval", "player": "ModBot", "script": "1", "reqId": "ce2"})
+        check("client_eval: an opted-in 0.1.x client without the eval capability is unsupported",
+              r.get("type") == "error" and r.get("code") == "unsupported", r)
+
+        ev = Bot(a.mc_host, a.mc_port, "EvalBot", client_mod=True, mod_version="0.2.0")
+        await ev.connect()
+        await next_event(lambda m: m.get("type") == "player_join" and m.get("player") == "EvalBot", timeout=20)
+        await asyncio.sleep(0.5)
+        await ev.send_dave("client_hello", {"modVersion": "0.2.0", "protocol": 1, "clientEvalAllowed": True,
+                                            "capabilities": ["render", "ask", "context", "eval"]})
+        await next_event(lambda m: m.get("type") == "client_mod" and m.get("player") == "EvalBot")
+        await ws.send(json.dumps({"type": "client_eval", "player": "EvalBot", "id": "agent-1",
+                                  "script": "mc.thePlayer.getHeldItem()", "params": {"n": 2}, "timeoutMs": 700,
+                                  "reqId": "ce3"}))
+        req, seen = await queue_get_matching(ev.packets, lambda p: p[0] == "client_eval_request")
+        check("client_eval: the opted-in client gets client_eval_request",
+              req is not None and req[1].get("script") == "mc.thePlayer.getHeldItem()"
+              and req[1].get("timeoutMs") == 700 and req[1].get("params") == {"n": 2}, seen)
+        if req:
+            # a result with another id, or from another player, is dropped; the right one is relayed
+            await mod.send_dave("client_eval_result", {"id": req[1]["id"], "ok": True, "result": "forged"})
+            await ev.send_dave("client_eval_result", {"id": "nope", "ok": True, "result": "wrong id"})
+            await ev.send_dave("client_eval_result", {"id": req[1]["id"], "ok": True, "result": {"held": None},
+                                                      "output": "printed", "ms": 0.5})
+            res = await next_event(lambda m: m.get("reqId") == "ce3")
+            check("client_eval: only the asked client's result is relayed, with the agent's id",
+                  res.get("type") == "client_eval_result" and res.get("id") == "agent-1"
+                  and res.get("player") == "EvalBot" and res.get("result") == {"held": None}
+                  and res.get("output") == "printed", res)
+        await ev.send_dave("client_settings", {"clientEvalAllowed": False})
+        await next_event(lambda m: m.get("type") == "client_mod" and m.get("player") == "EvalBot"
+                         and m.get("clientEvalAllowed") is False)
+        r = await request({"type": "client_eval", "player": "EvalBot", "script": "1", "reqId": "ce4"})
+        check("client_eval: opting out mid-session is respected at once",
+              r.get("type") == "error" and r.get("code") == "not_opted_in", r)
+        await ev.send_dave("client_settings", {"clientEvalAllowed": True})
+        await next_event(lambda m: m.get("type") == "client_mod" and m.get("player") == "EvalBot")
+        await ws.send(json.dumps({"type": "client_eval", "player": "EvalBot", "script": "1", "reqId": "ce5"}))
+        await queue_get_matching(ev.packets, lambda p: p[0] == "client_eval_request")
+        await ev.close()
+        res = await next_event(lambda m: m.get("reqId") == "ce5", timeout=10)
+        check("client_eval: a client that logs out answers disconnected",
+              res.get("ok") is False and res.get("errorType") == "disconnected", res)
+
     # ---- /dave command, run by PlainBot (needs PlainBot in the dev server's ops.json)
     if a.commands:
         for cmd, needle, name in (("/dave status", "Socket: listening", "/dave status"),
@@ -543,6 +597,7 @@ if __name__ == "__main__":
     p.add_argument("--mc-host", default="127.0.0.1")
     p.add_argument("--mc-port", type=int, default=25565)
     p.add_argument("--commands", action="store_true", help="test /dave as PlainBot (must be op on the dev server)")
+    p.add_argument("--client-eval", action="store_true", help="test the client_eval relay (DaveBridge 0.2.0+)")
     p.add_argument("--stop", action="store_true", help="have PlainBot (op) run /stop at the end")
     p.add_argument("-v", "--verbose", action="store_true")
     sys.exit(asyncio.run(main(p.parse_args())))

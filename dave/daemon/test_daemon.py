@@ -73,6 +73,7 @@ class FakeBridge:
         self.requests, self.ws, self.connections, self.warnings_next = [], None, 0, []
         self.tick = 0
         self.ignore_pings = False              # simulate a half-open connection: pings are never answered
+        self.accepts = ["list_players", "ping", "say", "thinking", "eval", "describe", "client_eval"]
 
     async def start(self):
         self.server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
@@ -92,7 +93,7 @@ class FakeBridge:
         ws = self.ws = WebSocket(reader, writer, mask=False)
         self.connections += 1
         await ws.send(json.dumps({"type": "hello", "protocol": 1, "mod": "davebridge", "version": "test",
-                                  "accepts": ["list_players", "ping", "say", "thinking"]}))
+                                  "accepts": self.accepts}))
         try:
             while True:
                 msg = json.loads(await ws.recv())
@@ -115,6 +116,16 @@ class FakeBridge:
                                                   "dropped": 0, "passTicks": 40, "warnings": [], "reqId": rid}))
                 elif t == "lesson_stop":
                     await ws.send(json.dumps({"type": "ack", "ok": True, "for": "lesson_stop", "reqId": rid}))
+                elif t in ("eval", "client_eval"):
+                    await ws.send(json.dumps({"type": "eval_result" if t == "eval" else "client_eval_result",
+                                              "ok": True, "id": msg.get("id"), "result": {"echo": msg},
+                                              "reqId": rid}))
+                elif t == "describe":
+                    await ws.send(json.dumps({"type": "description", "target": msg.get("target"),
+                                              "description": {"kind": "block", "player": msg.get("player")},
+                                              "reqId": rid}))
+                elif t == "list_players":
+                    await ws.send(json.dumps({"type": "players", "players": [], "reqId": rid}))
                 elif t == "ping" and not self.ignore_pings:
                     self.tick += 20
                     await ws.send(json.dumps({"type": "pong", "tick": self.tick, "queueDepth": 0, "reqId": rid}))
@@ -483,6 +494,152 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.5)
         self.assertFalse(self.daemon.bridge.ready.is_set())
         self.assertEqual(self.bridge.connections, 0)
+
+
+class BridgeToolTests(DaemonTests.__bases__[0]):
+    """The `bridge` MCP tools: the daemon's RPC socket and the stdio MCP server in front of it."""
+
+    async def asyncSetUp(self):
+        await DaemonTests.asyncSetUp(self)
+        self.saved["DAVE_QUERIES_DIR"] = os.environ.get("DAVE_QUERIES_DIR")
+        os.environ["DAVE_QUERIES_DIR"] = str(self.tmp / "queries")
+        self.cfg = config.load()
+        self.daemon = None
+
+    async def asyncTearDown(self):
+        if self.daemon:
+            await self.daemon.rpc.stop()
+        await DaemonTests.asyncTearDown(self)
+
+    async def start(self):
+        await DaemonTests.start(self)
+        await self.daemon.rpc.start()
+
+    async def call(self, op, **args):
+        reader, writer = await asyncio.open_unix_connection(str(self.daemon.rpc.path))
+        writer.write((json.dumps({"id": 1, "op": op, "args": args}) + "\n").encode())
+        await writer.drain()
+        reply = json.loads(await asyncio.wait_for(reader.readline(), 10))
+        writer.close()
+        return reply
+
+    def asking(self, name):
+        self.daemon.in_flight = main.Turn({"player": name, "playerUuid": "00000000-0000-0000-0000-0000000000aa"})
+
+    async def test_socket_is_private_and_eval_carries_the_asker(self):
+        await self.start()
+        mode = stat.S_IMODE(os.stat(self.daemon.rpc.path).st_mode)
+        self.assertEqual(mode, 0o600)
+        self.asking("Alex")
+        reply = await self.call("eval", script="1 + 1", timeout_ms=800)
+        self.assertTrue(reply["ok"], reply)
+        sent = self.bridge.of("eval")[-1]
+        self.assertEqual((sent["script"], sent["mode"], sent["player"], sent["timeoutMs"]), ("1 + 1", "read", "Alex", 800))
+        self.assertEqual(reply["result"]["type"], "eval_result")
+        self.assertNotIn("reqId", reply["result"])
+
+    async def test_write_needs_a_summary_and_goes_to_the_asker(self):
+        await self.start()
+        self.asking("Alex")
+        bad = await self.call("eval", script="world.setBlock(0,64,0,null)", mode="write")
+        self.assertFalse(bad["ok"])
+        self.assertIn("summary", bad["error"])
+        self.daemon.in_flight = None
+        nobody = await self.call("eval", script="x", mode="write", summary="s")
+        self.assertIn("asking player", nobody["error"])
+        self.asking("Alex")
+        ok = await self.call("eval", script="x", mode="write", summary="Place a stone at spawn", player="Mallory")
+        self.assertTrue(ok["ok"], ok)
+        sent = self.bridge.of("eval")[-1]
+        self.assertEqual((sent["mode"], sent["summary"], sent["confirmTimeoutSeconds"]),
+                         ("write", "Place a stone at spawn", 120))
+        self.assertEqual(sent["player"], "Mallory", "an explicit player is passed through")
+
+    async def test_client_eval_and_describe_default_to_the_asker(self):
+        await self.start()
+        self.asking("Alex")
+        await self.call("eval", script="mc.thePlayer", side="client")
+        self.assertEqual(self.bridge.of("client_eval")[-1]["player"], "Alex")
+        d = await self.call("describe", target="block", x=1, y=2, z=3)
+        self.assertTrue(d["ok"], d)
+        sent = self.bridge.of("describe")[-1]
+        self.assertEqual((sent["target"], sent["x"], sent["player"]), ("block", 1, "Alex"))
+
+    async def test_queries_save_list_run(self):
+        await self.start()
+        self.asking("Alex")
+        saved = await self.call("query_save", name="count-chests", description="How many chests are loaded",
+                                script="dave.tiles().count { it instanceof TileEntityChest }",
+                                params_doc={"dim": "number. Only this dimension"})
+        self.assertTrue(saved["ok"], saved)
+        dup = await self.call("query_save", name="count-chests", description="x", script="1")
+        self.assertFalse(dup["ok"])
+        listing = await self.call("query_list")
+        names = {q["name"]: q for q in listing["result"]["queries"]}
+        self.assertIn("count-chests", names)
+        self.assertEqual(names["count-chests"]["origin"], "saved")
+        self.assertIn("gt-recipes", names, "the shipped starters are listed too")
+        run = await self.call("query_run", name="count-chests", params={"dim": 0})
+        self.assertTrue(run["ok"], run)
+        sent = self.bridge.of("eval")[-1]
+        self.assertIn("TileEntityChest", sent["script"])
+        self.assertEqual((sent["params"], sent["id"]), ({"dim": 0}, "q:count-chests"))
+        recipes = await self.call("query_run", name="gt-recipes", params={"item": "minecraft:iron_ingot"})
+        self.assertTrue(recipes["ok"], recipes)
+        self.assertEqual(self.bridge.of("eval")[-1]["timeoutMs"], 5000, "the query's own timeout")
+        bad = await self.call("query_run", name="../etc/passwd")
+        self.assertFalse(bad["ok"])
+
+    async def test_old_bridge_and_no_bridge(self):
+        self.bridge.accepts = ["list_players", "ping", "say", "thinking"]
+        await self.start()
+        old = await self.call("eval", script="1")
+        self.assertIn("0.2.0", old["error"])
+        self.daemon.bridge.ready.clear()
+        down = await self.call("list_players")
+        self.assertIn("not connected", down["error"])
+
+    async def test_mcp_server_end_to_end(self):
+        await self.start()
+        self.asking("Alex")
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-I", str(HERE.parent / "bridge" / "server.py"),
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            env={"DAVE_BRIDGE_SOCKET": str(self.daemon.rpc.path), "PATH": os.environ.get("PATH", "")})
+
+        async def rpc(mid, method, params=None):
+            proc.stdin.write((json.dumps({"jsonrpc": "2.0", "id": mid, "method": method,
+                                          "params": params or {}}) + "\n").encode())
+            await proc.stdin.drain()
+            return json.loads(await asyncio.wait_for(proc.stdout.readline(), 10))
+        try:
+            init = await rpc(1, "initialize", {"protocolVersion": "2025-06-18"})
+            self.assertEqual(init["result"]["serverInfo"]["name"], "bridge")
+            tools = {t["name"] for t in (await rpc(2, "tools/list"))["result"]["tools"]}
+            self.assertTrue({"eval", "describe", "query_run", "query_save", "query_list", "say",
+                             "list_players"} <= tools)
+            res = await rpc(3, "tools/call", {"name": "eval", "arguments": {"script": "2 * 21"}})
+            self.assertFalse(res["result"]["isError"])
+            self.assertIn('"script":"2 * 21"', res["result"]["content"][0]["text"])
+            self.assertEqual(self.bridge.of("eval")[-1]["player"], "Alex")
+            err = await rpc(4, "tools/call", {"name": "eval", "arguments": {"script": "x", "mode": "write"}})
+            self.assertTrue(err["result"]["isError"])
+        finally:
+            proc.stdin.close()
+            await proc.wait()
+
+    async def test_mcp_server_without_daemon(self):
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-I", str(HERE.parent / "bridge" / "server.py"),
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            env={"DAVE_BRIDGE_SOCKET": str(self.tmp / "nope.sock")})
+        proc.stdin.write(b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_players"}}\n')
+        await proc.stdin.drain()
+        res = json.loads(await asyncio.wait_for(proc.stdout.readline(), 10))
+        proc.stdin.close()
+        await proc.wait()
+        self.assertTrue(res["result"]["isError"])
+        self.assertIn("not reachable", res["result"]["content"][0]["text"])
 
 
 if __name__ == "__main__":

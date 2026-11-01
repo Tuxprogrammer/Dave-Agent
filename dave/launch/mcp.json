@@ -1,5 +1,5 @@
 {
-  "_comment": "Template. dave_cmd.py fills in the placeholders, drops servers whose script does not exist yet, and passes the result via --mcp-config with --strict-mcp-config. Planned servers (bridge) are listed in dave/TOOLS.md, not here.",
+  "_comment": "Template. dave_cmd.py fills in the placeholders, drops servers whose script does not exist yet, and passes the result via --mcp-config with --strict-mcp-config.",
   "mcpServers": {
     "dave-memory": {
       "type": "stdio",
@@ -33,6 +33,14 @@
       "env": {
         "DAVE_ROOT": "${ROOT}",
         "DAVE_RECIPES_DB": "${RECIPES}"
+      }
+    },
+    "bridge": {
+      "type": "stdio",
+      "command": "${PYTHON}",
+      "args": ["-I", "${APP}/dave/bridge/server.py"],
+      "env": {
+        "DAVE_BRIDGE_SOCKET": "${BRIDGE_SOCKET}"
       }
     },
     "living-wiki": {

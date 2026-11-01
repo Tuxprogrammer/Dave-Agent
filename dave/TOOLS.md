@@ -34,7 +34,7 @@ checked result (ANSWER / CHAIN / TOTALS / RUNNER-UP / ...) that Dave turns into 
 
 | Field | Value |
 |---|---|
-| `tools` | Read, Grep, Glob, `gtnh_search`, `memory_recall`, `memory_get`, `player_get` (memory read-only), and the `recipes` tools (`recipe_producers`, `recipe_uses`, `recipe_get`, `item_find`, `plan_chain`). Tools of MCP servers that aren't registered are dropped at render time |
+| `tools` | Read, Grep, Glob, `gtnh_search`, `memory_recall`, `memory_get`, `player_get` (memory read-only), `query_run` and `query_list` (bridge), and the `recipes` tools (`recipe_producers`, `recipe_uses`, `recipe_get`, `item_find`, `plan_chain`). Tools of MCP servers that aren't registered are dropped at render time |
 | `maxTurns` | 40 |
 | `omitClaudeMd` | true (on top of the global CLAUDE.md shutdown) |
 
@@ -134,22 +134,47 @@ highspy (the MCP servers use `sys.executable`).
 Item ids: `<mod>:<name>[@meta]` (lowercase, meta 0 omitted), `fluid:<name>`, `aspect:<tag>`, `ore:<oredict>`.
 Allowed with `mcp__recipes`; `recipe-planner` gets all five.
 
-## MCP: `bridge` (planned; owner: the daemon, M2/M3)
+## MCP: `bridge` (live; owner: the daemon, M2)
 
-Exposed by the Dave daemon over the DaveBridge WebSocket (`DaveBridge/PROTOCOL.md`).
+`dave/bridge/server.py`, a stdio MCP server Claude starts like the others. It holds no connection of its own: each
+tool call goes as one JSON line to the daemon's unix socket (`DAVE_BRIDGE_SOCKET`, `<run>/bridge.sock`, mode 0600;
+a run dir too deep for a socket path uses `/tmp/dave-bridge-<uid>-<hash>.sock`, see `config.bridge_socket`), and
+the daemon (`dave/daemon/rpc.py`) forwards it over its one DaveBridge WebSocket (`DaveBridge/PROTOCOL.md` 1.8).
+Without a running daemon (`--probe`, `--smoke`) every call answers "the game is not reachable".
+
+The daemon fills in the **asker**: the player of the turn in flight becomes `player` for eval, describe and
+client eval, so a confirm always goes to the person who asked. Claude may name another player explicitly.
 
 | Tool | Does |
 |---|---|
-| `say(markup, target?)` | Post mid-turn (progress on a long job). Normal replies are the turn's final text, not this tool |
-| `describe(target)` | What a block, entity or item is at runtime: class, meta id, recipe map, tooltip |
-| `eval(script, side="server" or "client", confirm?)` | Groovy in the live JVM on the main-thread queue. Anything that changes the world requires the player's in-game confirm; client side only for opted-in players |
-| saved queries (`query_run`, `query_save`) | Reusable named scripts that worked |
+| `eval(script, mode="read", summary?, params?, timeout_ms?, side="server", player?)` | Groovy in the live JVM on the server thread (time limit, capped JSON result, blocked footguns, MCP names at runtime). `mode="write"` needs `summary`; the call waits (up to 2 min) for the asker's in-game Confirm. `side="client"` runs on the asker's own client, only if they opted in |
+| `describe(target="looking", x?, y?, z?, dim?, entity_id?, player?)` | Block, tile entity, item or entity at runtime: id, meta, class, name, GT MetaTileEntity, recipe map, description, inventory |
+| `query_run(name, params?, summary?)` | A saved query (below) |
+| `query_list()` / `query_get(name)` | What saved queries exist / one in full |
+| `query_save(name, description, script, mode?, side?, params_doc?, replace?)` | Save a script that worked |
+| `say(markup, target="@a")` | Post mid-turn (progress on a long job). Normal replies are the turn's final text |
 | `list_players()` | Who is online |
 | `lesson(player, lesson)` | **Ready on the wire, tool not wired yet.** Show one player a guided demonstration ("show me"); see below |
 | `lesson_stop(player, id?)` | Stop that player's demonstration |
 
-To add it: an entry in `launch/mcp.json` (its transport is the daemon's choice) and an `mcp__bridge` allow
-rule.
+**Saved queries.** Groovy files with a `// @key: value` header (`dave/bridge/queries.py`). Two folders: the
+shipped starters in `dave/queries/` (read-only, in the image) and Dave's saved ones in `[paths] queries`
+(`DAVE_QUERIES_DIR`, default `<memory>/queries`, so they live on the memory volume and are exported with it; the
+memory store ignores that folder). A saved query overrides a starter of the same name. Starters:
+
+| Query | Answers |
+|---|---|
+| `gt-recipes` | Producers (or `uses=true` consumers) of an item or fluid, live from GregTech's recipe maps: map, inputs, outputs with chances, EU/t, tier, ticks, special values (cleanroom, coil heat, ...); also crafting-table recipes |
+| `where-is-machine` | GT machines or any tile entity by name, nearest first, with `{waypoint:}` links |
+| `find-item` | Chests, drawers, GT super/quantum chests and AE networks holding an item, with counts and waypoints |
+| `nearest-ore-vein` | GT ore veins with an ore, from VisualProspecting's server record, with waypoints |
+| `find-structure` | Generated villages, temples, mineshafts, strongholds, fortresses, and dungeon spawners |
+
+All world lookups read loaded chunks only (they never load one). `DaveBridge`'s `StarterQueriesTest` compiles every
+starter with the server's engine settings on each build.
+
+Allowed in `launch/settings.json` as `mcp__bridge`. The `recipe-planner` subagent gets `query_run` and
+`query_list` (read lookups such as `gt-recipes`), not raw `eval`.
 
 ### `lesson` / `lesson_stop` (guided demonstrations; for whoever wires the `bridge` server)
 

@@ -177,7 +177,10 @@ Reply (only when `reqId` was given):
 - `warnings` lists everything that was degraded: unknown items, fluids, quests or players; blocked links or
   commands; markup that was not understood (kept as text); truncation. Read them to correct the next message.
   Warnings are also logged on the server.
-- Errors: `not_found` if the target player is offline, `bad_request` for an empty message.
+- A named `target` who is not online gets nothing: the ack says `recipients: 0` with the warning
+  `player 'X' is not online; the whisper was dropped` (since 0.2.0; earlier versions answered `not_found`). The
+  asker may have left, or be a `/dave ask` test name (section 5).
+- Errors: `bad_request` for an empty message.
 
 #### `thinking`
 
@@ -186,8 +189,8 @@ Reply (only when `reqId` was given):
 ```
 
 Shows a short gray italic "Dave is thinking..." line. With the client half the line replaces any earlier
-thinking line and disappears when the answer arrives (or after 60 s). Reply: `ack` (with `recipients`) /
-`error` as for `say`.
+thinking line and disappears when the answer arrives (or after 60 s). Reply: `ack` (with `recipients`, 0 when the
+player is not online) / `error` as for `say`.
 
 #### `list_players`
 
@@ -372,20 +375,150 @@ text, and chains become a hover list, all with warnings.
 | `queue_full` | The main-thread queue is at `maxQueueDepth`. Retry later. |
 | `cancelled` | The server is stopping: queued actions that had not run yet, and any message received while it stops. Sent before `server_stopping` and the close. |
 | `internal` | A handler threw. Logged on the server; the server itself is unaffected. |
+| `disabled` | The feature is turned off in the server config (`eval.evalEnabled`, `eval.clientEvalRelay`). |
+| `not_opted_in` | `client_eval` for a player whose client half has not opted in (or has no client half). |
+| `unsupported` | `client_eval` for a client half too old to run scripts (no `eval` capability). |
 
 Errors never close an authenticated connection.
 
-### 1.8 Planned (not implemented yet)
+### 1.8 Live eval (milestone 2)
 
-These names are reserved; servers that support them list them in `hello.accepts`.
+Groovy scripts from the agent, run inside the server JVM (or, for opted-in players, their own client). The trust
+model is the README's: trusted players only, so arbitrary code is accepted on purpose. The safeguards below prevent
+accidents (a frozen tick, a crashed server, a world change nobody saw), not attacks. Servers that support this list
+`eval`, `describe` and `client_eval` in `hello.accepts`.
 
-- **`client_eval`** (agent to server): run a script on one player's client.
-  `{"type":"client_eval","player":"Steve","id":"e1","script":"...","mode":"groovy","reqId":...}`.
-  The server only forwards it if that player's `client_mod` event reported `clientEvalAllowed: true`, sends a
-  `ClientEvalRequest` packet and relays the `ClientEvalResult` back as
-  `{"type":"client_eval_result","id":"e1","player":"Steve","ok":true,"result":...}` or with `"ok":false,"error":"..."`.
-- **Server-side `eval`** (Groovy on the server thread via the same task queue), **introspection**
-  (reflection over loaded classes and objects) and **SRG/MCP name mapping** will be further request types.
+#### `eval`
+
+```json
+{"type":"eval","id":"e1","script":"world.getBlock(0,64,0).getLocalizedName()","mode":"read",
+ "player":"Steve","params":{"item":"gregtech:gt.metaitem.01:32600"},"timeoutMs":1000,"reqId":11}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `script` | yes | Groovy source, at most 64 KiB. Its last expression is the result. |
+| `id` | no | Echoed in the result and in `eval_pending`. |
+| `mode` | no | `"read"` (default) runs at once. `"write"` waits for the asking player's Confirm click (below). |
+| `player` | for `write` | The asking player (the daemon fills it in from the turn). Bound as `player` when online. |
+| `summary` | for `write` | One line shown to the player: what will change. |
+| `params` | no | JSON object, bound as `params` (numbers arrive as doubles: use `params.n as int`). |
+| `timeoutMs` | no | Time limit, default `evalTimeoutMillis` (500), at most `evalMaxTimeoutMillis` (5000). |
+| `confirmTimeoutSeconds` | no | `write` only: how long to wait for the click (default 120, at most 600). |
+
+**What a script sees.** `server` (MinecraftServer), `player` (the asker's EntityPlayerMP, or null), `asker` (name),
+`world` (the asker's world, else the overworld), `params`, `log`, `out` (`println` goes to the result's `output`), and
+`dave`, a helper object:
+
+- reflection that speaks MCP names: `dave.fields(obj)`, `dave.methods(obj, "filter")`, `dave.get(obj, "name")`,
+  `dave.call(obj, "name", args...)`, `dave.cls("full.ClassName")`, `dave.mcp("field_71071_by")`, `dave.srg("inventory")`;
+- lookups (loaded state only; nothing loads a chunk): `dave.players()`, `dave.player(name)`, `dave.world(dim)`,
+  `dave.worlds()`, `dave.te(dim,x,y,z)`, `dave.tiles(world)` / `dave.tiles()` (loaded tile entities),
+  `dave.describe(dim,x,y,z)`, `dave.describe(stack)`, `dave.looking(player)`;
+- formatting: `dave.item(stack)` (`id, meta, count, name, ore, nbt`), `dave.fluid(fluidStack)`, `dave.markupId(stack)`
+  (for `{item:...}`), `dave.waypoint(x,y,z,dim,label)` (a `{waypoint:...}` markup link), `dave.dump(obj)`.
+
+Common packages are imported (`net.minecraft.{block,entity,entity.player,init,inventory,item,nbt,server,tileentity,
+util,world}`, `net.minecraftforge.{common.util,fluids,oredict}`); other classes need their full name or an import.
+
+**MCP names work at runtime.** Outside the dev environment vanilla members only exist under SRG names
+(`field_71071_by`). When a property or method of a Minecraft-hierarchy class is missing, it is retried under each
+SRG name of that MCP name (table generated at build time from Forge's own mapping, the names mod source uses,
+plus MCP stable_12, the names in the decompiled vanilla source), so `player.inventory`, `entity.getHealth()`,
+`entity.health`, `stack.getItemDamage()` / `stack.getMetadata()` and `Blocks.stone` all work. Mod classes keep their
+real names. On a dedicated server some mod classes declare client-only signatures without `@SideOnly`, so Java cannot
+list their members; Groovy then dispatches through their nearest listable superclass (overrides still run), and
+methods only that class declares are out of reach.
+
+`dave.items(spec)` (a fast stack matcher) and `dave.gtRecipes(item, fluid, uses, map, limit)` (every GregTech
+recipe map scanned in Java, tens to a few hundred milliseconds) keep heavy lookups off Groovy's dynamic dispatch.
+
+**Safeguards.**
+- Compiled off the server thread, then run on it through the main-thread queue (section 3).
+- Time limit: a check compiled into every loop, method and closure stops the script with `errorType:"timeout"`.
+  Java code it calls is not interrupted, so a long call inside another mod finishes first.
+- Refused at compile time (`errorType:"blocked"`): `System.exit`, `Runtime.halt`, `initiateShutdown`, `stopServer`,
+  `sleep`, `wait`, thread `stop`, and `executeCommand` with a stop or restart command.
+- `mode:"read"` scripts that call obvious world changers (`setBlock`, `setInventorySlotContents`, `setDead`,
+  `spawnEntityInWorld`, `executeCommand`, `stackSize =`, ...) are refused with `errorType:"needs_confirm"`: resend
+  as `write` with a summary. A read script that changes the world some other way runs anyway (trusted players).
+- Results are converted to JSON with caps (depth 8, 500 items per collection, 8000 characters per string,
+  `evalMaxResultChars` overall); anything cut sets `truncated:true`. Items, fluids, tile entities, entities and
+  worlds have compact shapes; other objects become `{"$class":..., "$str": toString()}`.
+- Exceptions are caught and returned; they never reach the server.
+
+Reply:
+
+```json
+{"type":"eval_result","id":"e1","mode":"read","side":"server","ok":true,"result":"Stone","output":"",
+ "ms":0.42,"reqId":11}
+{"type":"eval_result","id":"e1","mode":"read","side":"server","ok":false,"errorType":"exception",
+ "error":"java.lang.NullPointerException","line":3,"stack":["DaveScript7.run(DaveScript7.groovy:3)", "..."],"reqId":11}
+```
+
+`errorType` is one of `compile`, `blocked`, `needs_confirm`, `timeout`, `exception`, and for `write`: `cancelled`,
+`expired`, `too_many_pending`. Optional fields: `truncated`, `outputTruncated`, `warnings`, `confirmed`,
+`confirmedBy`. Request errors (`bad_request`, `disabled`, `queue_full`, `cancelled`) come as `error` messages.
+
+**World changes need the asking player's confirm (`mode:"write"`).** An accident guard against the agent's mistakes:
+1. The script is compiled. The asking player sees `[Dave] wants to change the world: <summary>` (hover: the script)
+   and `[Confirm] [Cancel] (expires in 2 min)`. The buttons run `/dave confirm <id>` and `/dave cancel <id>`.
+2. The agent at once gets an event without `reqId`:
+   `{"type":"eval_pending","id":"e1","player":"Steve","playerOnline":true,"confirmId":"3fa9c0d1e2","summary":"...","expiresInSeconds":120}`.
+3. The request's reply is the `eval_result` after the click (`confirmed:true`, with the run's outcome), or
+   `ok:false` with `cancelled` or `expired`. So the agent's request waits up to `confirmTimeoutSeconds`.
+- Only the asking player's click counts; another player's click is refused. Each confirm runs at most once. A
+  player may have 5 waiting. The server console (or RCON) may answer any confirm, which is how an asker who is not
+  online (a `/dave ask` test name) is confirmed.
+- If `backupCommand` is set, it runs right before the confirmed script.
+
+#### `describe`
+
+```json
+{"type":"describe","target":"looking","player":"Steve","reqId":12}
+{"type":"describe","target":"block","dim":0,"x":10,"y":64,"z":-4,"reqId":13}
+```
+
+`target`: `looking` (the block the player looks at, ray-traced on the server, `reach` default 64), `held`,
+`player`, `block` (`x`,`y`,`z`, `dim` default the player's or 0), `entity` (`entityId`, `dim`). Reply:
+
+```json
+{"type":"description","target":"block","description":{"kind":"block","dim":0,"x":10,"y":64,"z":-4,
+ "id":"gregtech:gt.blockmachines","meta":0,"blockClass":"...","name":"Electric Blast Furnace",
+ "tile":{"class":"gregtech.api.metatileentity.BaseMetaTileEntity","gregtech":{"metaTileId":1000,"owner":"Steve",
+ "mteClass":"...MTEElectricBlastFurnace","metaName":"multimachine.blastfurnace","localName":"Electric Blast Furnace",
+ "description":["..."],"recipeMap":"gt.recipe.blastfurnace"},"inventory":{"size":2,"slots":[]}}},"reqId":13}
+```
+
+GregTech machines add `gregtech` (MetaTileEntity id, class, names, tooltip description lines, recipe map, owner);
+a held GT machine item names its machine. Item tooltips are client-side in 1.7.10 and do not exist on a dedicated
+server: use `client_eval` for a player's real tooltip. An unloaded position answers `"loaded":false` (never loads
+the chunk). Errors: `not_found` (player offline, dimension not loaded, no such entity), `bad_request`.
+
+#### `client_eval`
+
+```json
+{"type":"client_eval","player":"Steve","id":"c1","script":"mc.thePlayer.getHeldItem()?.getTooltip(mc.thePlayer, false)",
+ "params":{},"timeoutMs":500,"reqId":14}
+```
+
+Runs a script on one player's own client. **Only for a player who opted in** (`clientEvalAllowed`, client config or
+`/davebridge optin`), because the code runs on their machine. The server checks the player's current opt-in at send
+time (the latest `client_hello` / `client_settings`) and refuses otherwise (`not_opted_in`); a client half without
+the `eval` capability gets `unsupported`. The client re-checks its own setting before running it. It runs on the
+client thread with the same time limit and caps (`timeoutMs` at most 2000 there), with `mc` (Minecraft), `player`
+(`mc.thePlayer`), `world` (`mc.theWorld`), `params`, `out` and `dave` (the common helpers plus
+`dave.tooltip(stack)`). No confirm step: it changes nothing on the server.
+
+Reply (the client's result relayed):
+
+```json
+{"type":"client_eval_result","id":"c1","player":"Steve","side":"client","ok":true,"result":["Iron Pickaxe","..."],
+ "ms":0.8,"reqId":14}
+```
+
+If the client does not answer within `clientEvalTimeoutSeconds` (or logs out first) the result is `ok:false`
+with `errorType:"timeout"` or `"disconnected"`.
 
 ---
 
@@ -429,14 +562,14 @@ The client says hello again on every new connection. The server forgets a player
 
 | Kind | Direction | Fields |
 |---|---|---|
-| `client_hello` | C->S | `modVersion`, `protocol`, `capabilities` (string[], e.g. `render`, `ask`, `context`, `nei`), `clientEvalAllowed` (bool) |
+| `client_hello` | C->S | `modVersion`, `protocol`, `capabilities` (string[], e.g. `render`, `ask`, `context`, `nei`, and `eval` from 0.2.0: can run `client_eval_request`), `clientEvalAllowed` (bool) |
 | `ask` | C->S | `text` (string), `context` (object) |
 | `client_settings` | C->S | `clientEvalAllowed` (bool): the player changed their opt-in mid-session |
-| `client_eval_result` | C->S | **Reserved (M2).** `id`, `ok`, `result` (any JSON), `error`. Ignored by the server today. |
+| `client_eval_result` | C->S | `id`, `ok`, `result` (any JSON), `error`, `errorType`, `output`, `ms`, `truncated`: the outcome of a `client_eval_request` (section 1.8). Results the server did not ask for are dropped. |
 | `server_hello` | S->C | `modVersion`, `protocol`, `botName`, `triggerPrefixes` (string[]), `maxAskLength` (int; 0 or missing from older servers) |
 | `dave_message` | S->C | **Unused since rich chat.** `botName`, `text`, `replyTo`. Dave's replies now arrive as normal chat for everyone; clients still render it if received. |
 | `thinking` | S->C | `botName`, `clear` (bool): show the indicator, or remove it because the answer arrived |
-| `client_eval_request` | S->C | **Reserved (M2).** `id`, `script`, `mode`. Never sent today; the client logs and ignores it. |
+| `client_eval_request` | S->C | `id`, `script`, `mode` (`"groovy"`), `timeoutMs`, `params` (JSON object). Sent only to players whose client reported `clientEvalAllowed` and the `eval` capability; the client re-checks its own opt-in before running it (section 1.8). |
 | `lesson` | S->C | A validated lesson (section 2.6): `id`, `title`, `loop`, `speed`, `dim`, `anchor` (x,y,z), `start` (x,y,z), `steps` |
 | `lesson_stop` | S->C | `id` (null or empty: whatever is playing) |
 | `lesson_status` | C->S | `id`, `state` (`finished`/`stopped`), `reason` (see `lesson_status` in 1.3) |
@@ -549,6 +682,16 @@ tick by the client half. Later milestones (Groovy eval, introspection) submit th
 | chat | `replySoundPitch` | `1.4` | 0.5 to 2. |
 | queue | `tickBudgetMillis` | `5` | Time per tick for queued tasks. |
 | queue | `maxQueueDepth` | `1000` | Further tasks are rejected (`queue_full`). |
+| eval | `evalEnabled` | `true` | Accept `eval` and `describe`. |
+| eval | `evalTimeoutMillis` | `500` | Default time limit of a script (it holds the server tick while it runs). |
+| eval | `evalMaxTimeoutMillis` | `5000` | Largest `timeoutMs` a request may ask for. |
+| eval | `evalMaxResultChars` | `65536` | Approximate cap on a result's JSON size. |
+| eval | `evalMaxOutputChars` | `16384` | Printed output kept per script. |
+| eval | `confirmTimeoutSeconds` | `120` | Default wait for a Confirm click. |
+| eval | `confirmMaxTimeoutSeconds` | `600` | Longest `confirmTimeoutSeconds` a request may ask for. |
+| eval | `backupCommand` | (empty) | Server command run right before a confirmed write, e.g. `backup start` (ServerUtilities; it copies in the background, so the backup may finish after the change). |
+| eval | `clientEvalRelay` | `true` | Relay `client_eval` to opted-in players at all. |
+| eval | `clientEvalTimeoutSeconds` | `30` | How long to wait for a client's result. |
 
 `/dave reload` re-reads the file. The socket restarts only if `bindAddress`, `port`, `authToken`,
 `maxClients` or `maxMessageBytes` changed (which also drops connected agents), or if `enabled` changed.
@@ -564,7 +707,29 @@ tick by the client half. Later milestones (Groovy eval, introspection) submit th
 ## 5. Commands
 
 `/dave status` and `/dave reload`, permission level 3 (ops). Status shows the socket state, connected and
-authenticated agents, queue depth and timing, and how many online players have the client half.
+authenticated agents, queue depth and timing, how many online players have the client half, and how many changes
+wait for a confirm.
+
+**Confirms (any player, or the console).**
+
+- `/dave confirm <id>` / `/dave cancel <id>`: what the `[Confirm]` and `[Cancel]` buttons of a world-changing
+  script run (section 1.8). A player may answer only their own confirm; the console (or RCON) may answer any.
+
+**Test hooks (ops and the console).** These exist so the whole Dave loop can be exercised from `rcon-cli` with nobody
+online:
+
+- `/dave ask <asName> [@x,y,z[,dim]] <question...>`: sends the agent a `chat` event exactly like a triggered chat
+  line from `asName`: `triggered:true`, `prompt` = the question without a trigger prefix (if it has one),
+  `source:"console"`, `hasClientMod:false`. `playerUuid` is the online player's, else the one Forge's username cache
+  remembers for that name, else the offline-mode UUID derived from the name (stable). The position defaults to the
+  online player's, else the overworld spawn (dim 0). Replies need no player online: a public reply is broadcast as
+  usual, a whisper to an absent name is dropped with a warning in the `say` ack.
+- `/dave pending`: lists the changes waiting for a confirm (`id`, asking player, seconds left, summary).
+
+`DaveBridge/tools/eval_check.py` runs these against a test server (agent socket plus RCON: reads, timeouts, blocked
+calls, describe, a confirmed and a cancelled write, an expiry, `/dave ask`, the starter queries; `--gt` adds the
+GregTech checks). It places one glass block 40 above spawn and removes it again. `dave/daemon/e2e_bridge_check.py`
+does the same through the real daemon and the `bridge` MCP server, with a fake Claude (no model calls).
 
 Client half only:
 
