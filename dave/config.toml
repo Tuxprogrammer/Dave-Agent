@@ -40,6 +40,8 @@ memory      = "data/memory"                # DAVE_MEMORY_DIR   Dave's memories (
 claude_home = "dave/.claude-home"          # DAVE_CLAUDE_HOME  CLAUDE_CONFIG_DIR and HOME for Dave's claude (git-ignored)
 run         = "dave/.run"                  # DAVE_RUN_DIR      rendered prompt/settings/mcp files, logs (git-ignored)
 workdir     = "/tmp/dave-agent/work"      # DAVE_WORKDIR  Dave's empty cwd. MUST be outside this repo AND the owner's home
+recipes     = "data/recipes.sqlite"        # DAVE_RECIPES_DB   recipe database (tools/recipes). Production: the read-only
+                                           #                   copy baked into the image, e.g. /dave/ro/recipes.sqlite
 logs        = "dave/.run/daemon"           # DAVE_LOG_DIR      the daemon's turns.jsonl and daemon.log. Production: a volume,
                                            #                   e.g. /dave/data/logs (the run dir is tmpfs there)
 

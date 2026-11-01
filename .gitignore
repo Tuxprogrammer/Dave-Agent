@@ -15,6 +15,9 @@ data/wiki-git.lock
 data/wiki-review.jsonl
 data/wiki-reports/
 data/exports/
+# Recipe database built by tools/recipe-export/run.sh (tools/recipes/build_db.py); baked read-only into the image.
+data/recipes.sqlite
+data/recipes.sqlite.tmp
 
 # Downloads, extracted packs, trial state (large, regenerable)
 .work/

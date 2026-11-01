@@ -25,6 +25,7 @@ ENV = {
     ("paths", "run"): "DAVE_RUN_DIR",
     ("paths", "workdir"): "DAVE_WORKDIR",
     ("paths", "logs"): "DAVE_LOG_DIR",
+    ("paths", "recipes"): "DAVE_RECIPES_DB",
     ("prompt", "soul"): "DAVE_SOUL",
     ("prompt", "planner"): "DAVE_PLANNER_PROMPT",
     ("prompt", "markup_spec"): "DAVE_MARKUP_SPEC",
