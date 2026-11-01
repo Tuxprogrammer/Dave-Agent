@@ -1,0 +1,23 @@
+{
+  "_comment": "Template for --agents. dave_cmd.py fills in the prompt (dave/soul/recipe-planner.md) and the model ([model] planner), drops tools of MCP servers that are not registered, and writes the result to the run dir. Exactly one agent: Dave's settings deny every other agent type.",
+  "recipe-planner": {
+    "description": "Plans GTNH production chains and factory designs with the recipe tools and the chain planner, and compares routes. Use it for multi-step chains, 'best/cheapest route' questions with locks or constraints, and factory layouts. Not for single recipe lookups. Pass the target, rate, the player's tier and setup, and every lock, free input and ban. It returns a compact checked result to turn into chat.",
+    "prompt": "${PLANNER_PROMPT}",
+    "model": "${PLANNER_MODEL}",
+    "tools": [
+      "Read", "Grep", "Glob",
+      "mcp__gtnh-search__gtnh_search",
+      "mcp__living-wiki__wiki_get",
+      "mcp__dave-memory__memory_recall",
+      "mcp__dave-memory__memory_get",
+      "mcp__dave-memory__player_get",
+      "mcp__recipes__recipe_producers",
+      "mcp__recipes__recipe_uses",
+      "mcp__recipes__recipe_get",
+      "mcp__recipes__item_find",
+      "mcp__recipes__plan_chain"
+    ],
+    "maxTurns": 40,
+    "omitClaudeMd": true
+  }
+}

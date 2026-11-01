@@ -1,0 +1,6 @@
+# Files in this folder that are NOT part of the pack
+README.md
+docs/
+scripts/
+*.md
+.gitignore

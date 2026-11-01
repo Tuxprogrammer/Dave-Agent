@@ -1,0 +1,36 @@
+hash-format = "sha256"
+
+[[files]]
+file = "config/findit.cfg"
+hash = "af9e16085f39e4b3a5ddd26aef85309377f653a95bb44c2ae82b4339ad4580d6"
+
+[[files]]
+file = "config/fortunateone.cfg"
+hash = "e6676f0d6fdc36d39f7c5bca1847457882628f95ee960f7e2c0105d4d535b84f"
+
+[[files]]
+file = "mods/WorldEditCuiFe-v1.0.7-mf-1.7.10-10.13.4.1566.jar"
+hash = "fafc2dc319b50018e63712cfd087f1f32c112443e37dbdc1c09bf84bd2bc514a"
+
+[[files]]
+file = "mods/davebridge-0.1.2.jar"
+hash = "d168788548811323bf0a974cbfe4faf91acfcf229b5f8b473e79f66301623203"
+
+[[files]]
+file = "mods/fortunateone.pw.toml"
+hash = "278262db2cc938ffbe15dc2677d72c14f8a15d45214f05ef57e5b791397a5a69"
+metafile = true
+
+[[files]]
+file = "mods/gregguns-2ea0ea5.jar"
+hash = "4875b4e97cc11cf3ecb114a8d37f4c5d3163acd231eddf0f214e780316a4884a"
+
+[[files]]
+file = "mods/journeymap-unlimited.pw.toml"
+hash = "9475c3746fc2b431de120d09d9fb03304467cba498035773d5e5b1efc56a65e7"
+metafile = true
+
+[[files]]
+file = "mods/worldedit.pw.toml"
+hash = "a58676bd7049fd7bb0059f59fec6856b0f4fc7a823fd7ae2581a78b5a65e0e81"
+metafile = true

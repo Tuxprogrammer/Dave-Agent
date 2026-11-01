@@ -1,0 +1,34 @@
+.env
+data/index/
+data/corpus/wiki/
+
+# Dave core (dave/): secrets and runtime state. data/memory/ is deliberately NOT ignored: memories are versioned.
+dave/.env
+dave/.claude-home/
+dave/.run/
+__pycache__/
+data/memory/.lock
+data/memory/**/.tmp-*
+data/corpus/.wiki.*
+data/wiki-git/
+data/wiki-git.lock
+data/wiki-review.jsonl
+data/wiki-reports/
+data/exports/
+
+# Downloads, extracted packs, trial state (large, regenerable)
+.work/
+
+# tuxmine pack distribution: build output lives in .work/tuxmine/. Guard against strays in the
+# packs (packwiz-installer state, instance zips) and any local secrets file next to deploy files.
+tuxmine/**/packwiz.json
+tuxmine/**/packwiz-installer*.jar
+tuxmine/**/*.zip
+tuxmine/deploy/secrets/
+
+# Generated source tree (1.7 GB, partly closed-source decompiles): regenerate with tools/decomp/. Only the
+# indexes are versioned.
+gtnh-src/*
+!gtnh-src/INDEX.md
+!gtnh-src/SOURCE-INDEX.md
+!gtnh-src/source-index.json

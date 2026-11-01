@@ -1,0 +1,32 @@
+{"id": "q01", "question": "best nitrogen source at HV", "expect": ["quest:AAAAAAAAAAAAAAAAAAACKw==", "quest:7p2Sqx7dR8mfVCNUYEUIuQ==", "quest:AAAAAAAAAAAAAAAAAAAAUQ=="], "note": "air centrifuging at LV; liquid air via the vacuum freezer"}
+{"id": "q02", "question": "how do I make steel early", "expect": ["quest:AAAAAAAAAAAAAAAAAAAATA==", "guide:gregtech/multiblocks/bricked_blast_furnace.md", "quest:AAAAAAAAAAAAAAAAAAACuQ=="], "note": "Bricked Blast Furnace"}
+{"id": "q03", "question": "what is a cleanroom for", "expect": ["quest:AAAAAAAAAAAAAAAAAAADrA==", "guide:gregtech/multiblocks/cleanroom.md", "lang:gregtech/tooltip/cleanroom"]}
+{"id": "q04", "question": "which quest unlocks the EBF", "expect": ["quest:AAAAAAAAAAAAAAAAAAAATQ=="], "note": "EBF-Time (Tier 1 - LV)"}
+{"id": "q05", "question": "how do I get aluminium ingots", "expect": ["quest:AAAAAAAAAAAAAAAAAAAATQ==", "guide:gregtech/multiblocks/electric_blast_furnace.md"], "note": "needs the EBF"}
+{"id": "q06", "question": "my EBF makes hot ingots, how do I cool them", "expect": ["quest:AAAAAAAAAAAAAAAAAAAAUQ==", "guide:gregtech/multiblocks/vacuum_freezer.md"], "note": "vacuum freezer"}
+{"id": "q07", "question": "where do I get chlorine", "expect": ["quest:AAAAAAAAAAAAAAAAAAAKiQ=="], "note": "electrolyze salt / salt water"}
+{"id": "q08", "question": "how do I make titanium", "expect": ["quest:AAAAAAAAAAAAAAAAAAAD9A=="], "note": "rutile -> TiCl4 -> EBF with magnesium"}
+{"id": "q09", "question": "how do I get my first platinum at HV", "expect": ["quest:AAAAAAAAAAAAAAAAAAAI9w=="]}
+{"id": "q10", "question": "how many channels can an ME network have without a controller", "expect": ["quest:AAAAAAAAAAAAAAAAAAAIWQ==", "guide:appliedenergistics2/ae2_mechanics/channels.md"], "note": "8 channels"}
+{"id": "q11", "question": "how do I set up AE2 autocrafting", "expect": ["guide:appliedenergistics2/ae2_mechanics/autocrafting.md", "quest:AAAAAAAAAAAAAAAAAAAFIA=="]}
+{"id": "q12", "question": "what are P2P tunnels used for", "expect": ["guide:appliedenergistics2/ae2_mechanics/p2p_tunnels.md", "guide:appliedenergistics2/items_blocks/p2p_tunnels.md"]}
+{"id": "q13", "question": "how do bytes and types work on storage cells", "expect": ["guide:appliedenergistics2/ae2_mechanics/bytes_and_types.md", "guide:appliedenergistics2/items_blocks/storage_cells.md"]}
+{"id": "q14", "question": "how does overclocking work in GregTech", "expect": ["guide:gregtech/tierskipping_overcloking_parallels/overclocking.md"]}
+{"id": "q15", "question": "what are the voltage tiers", "expect": ["guide:gregtech/power/voltage_tiers.md"]}
+{"id": "q16", "question": "why am I losing power over long cables", "expect": ["guide:gregtech/power/cable_loss.md", "guide:gregtech/power/cable.md"]}
+{"id": "q17", "question": "what do parallels do in a multiblock", "expect": ["guide:gregtech/tierskipping_overcloking_parallels/parallels.md"]}
+{"id": "q18", "question": "how do I get more out of my ores than macerating", "expect": ["quest:AAAAAAAAAAAAAAAAAAACGg=="], "note": "ore washer"}
+{"id": "q19", "question": "how do I automate hydrogen and oxygen production", "expect": ["quest:AAAAAAAAAAAAAAAAAAAGZg=="], "note": "electrolyzing water"}
+{"id": "q20", "question": "how do I desulfurize sulfuric light fuel", "expect": ["quest:AAAAAAAAAAAAAAAAAAAGZw=="]}
+{"id": "q21", "question": "how big can a cleanroom be and what is it made of", "expect": ["quest:AAAAAAAAAAAAAAAAAAADrA==", "guide:gregtech/multiblocks/cleanroom.md"]}
+{"id": "q22", "question": "how do I build a distillation tower for oil", "expect": ["guide:gregtech/multiblocks/distillation_tower.md", "quest:AAAAAAAAAAAAAAAAAAALrA==", "lang:gregtech/tooltip/distillation-tower"]}
+{"id": "q23", "question": "how do I start thaumcraft research", "expect": ["guide:thaumcraft/aspects_scanning_research.md", "guide:thaumcraft/thaumcraft_basics.md"]}
+{"id": "q24", "question": "how does infusion crafting work", "expect": ["guide:thaumcraft/infusion_crafting.md"]}
+{"id": "q25", "question": "what is warp and how do I get rid of it", "expect": ["guide:thaumcraft/warp_eldritch.md"]}
+{"id": "q26", "question": "is the cryogenic freezer better than the vacuum freezer", "expect": ["quest:AAAAAAAAAAAAAAAAAAAH8w==", "lang:gregtech/tooltip/cryogenic-freezer"]}
+{"id": "q27", "question": "how do I get liquid air", "expect": ["quest:7p2Sqx7dR8mfVCNUYEUIuQ==", "quest:AAAAAAAAAAAAAAAAAAAAUQ=="]}
+{"id": "q28", "question": "can bricked blast furnaces share walls", "expect": ["guide:gregtech/multiblocks/bricked_blast_furnace.md", "quest:AAAAAAAAAAAAAAAAAAACuQ==", "quest:AAAAAAAAAAAAAAAAAAAATA=="]}
+{"id": "q29", "question": "I need something better than the mortar for grinding ores in steam age", "expect": ["quest:AAAAAAAAAAAAAAAAAAAAMg=="], "note": "steam macerator"}
+{"id": "q30", "question": "what do I need the circuit assembler for", "expect": ["quest:AAAAAAAAAAAAAAAAAAADGw=="]}
+{"id": "q31", "question": "my steam machines need more steam, what boiler next", "expect": ["quest:AAAAAAAAAAAAAAAAAAAAPA=="], "note": "large coal boiler"}
+{"id": "q32", "question": "which ME controller shapes are valid", "expect": ["quest:AAAAAAAAAAAAAAAAAAAIWQ==", "guide:appliedenergistics2/items_blocks/controller.md"]}

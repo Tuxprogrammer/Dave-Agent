@@ -1,0 +1,8 @@
+name = "DiscordIntegration"
+filename = "DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar"
+side = "server"
+
+[download]
+url = "https://edge.forgecdn.net/files/3147/365/DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar"
+hash-format = "sha256"
+hash = "16a34f1e5e896dfad956b8cb731dcc85409650335257a103ea31b3bb9e109b46"

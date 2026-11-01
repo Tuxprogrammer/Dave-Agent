@@ -1,0 +1,33 @@
+hash-format = "sha256"
+
+[[files]]
+file = "config/fortunateone.cfg"
+hash = "e6676f0d6fdc36d39f7c5bca1847457882628f95ee960f7e2c0105d4d535b84f"
+
+[[files]]
+file = "mods/davebridge-0.1.2.jar"
+hash = "d168788548811323bf0a974cbfe4faf91acfcf229b5f8b473e79f66301623203"
+
+[[files]]
+file = "mods/discordintegration.pw.toml"
+hash = "8efaffe3c882d97e2fc9897833ab210429ea372f3ef6849116d1d3bc13916e9f"
+metafile = true
+
+[[files]]
+file = "mods/fortunateone.pw.toml"
+hash = "9105c4e77ba52ec0a9c5e9b234a23ef0a76d3921eddf0a3f6208c53195988497"
+metafile = true
+
+[[files]]
+file = "mods/gregguns-2ea0ea5.jar"
+hash = "4875b4e97cc11cf3ecb114a8d37f4c5d3163acd231eddf0f214e780316a4884a"
+
+[[files]]
+file = "mods/journeymap-unlimited.pw.toml"
+hash = "59e8fe7b2a06fbc1133493bbeeba54268e2d34983e803d6c2f13439734276e0a"
+metafile = true
+
+[[files]]
+file = "mods/worldedit.pw.toml"
+hash = "3499908f4643ed1551b16ea388afce382c2f53ade1c93e4f9d9cbc5b79e91641"
+metafile = true

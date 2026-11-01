@@ -1,0 +1,13 @@
+name = "tuxmine-server"
+author = "Spencer Callicott"
+version = "0.1.6"
+pack-format = "packwiz:1.1.0"
+
+[index]
+file = "index.toml"
+hash-format = "sha256"
+hash = "4977ecad02df2fa3f44c82f74f0ea987ed60c9ce18e3dcc93d6016e2d6180c71"
+
+[versions]
+forge = "10.13.4.1614"
+minecraft = "1.7.10"

@@ -1,0 +1,57 @@
+# tuxmine pack host. Lives at /opt/gtnh/Caddyfile, mounted read-only into the caddy service.
+#
+# Plain HTTP on 8073 only. TLS for https://pack.example.net/ is terminated by Nginx Proxy
+# Manager on proxy-host.example.net, which proxies to http://<desktop>:8073 and also applies the rate
+# limits (tuxmine/deploy/npm/). The GTNH server container fetches its pack inside the stack at
+# http://caddy:8073/<token>/server/pack.toml.
+# Nothing here listens on 80 or 443, and Caddy never asks for a certificate.
+#
+# Everything is published under /srv/packs/<token>/ (see scripts/publish.sh). Nothing exists at
+# the root, and with no `browse` a directory without index.html is a 404, so without the token
+# every path except /healthz is a 404. This file never needs to know the token.
+{
+	auto_https off
+	servers {
+		# NPM sits in front: take the real client address from X-Forwarded-For when the
+		# request comes from a private (LAN / docker) address, so the access log is useful.
+		trusted_proxies static private_ranges
+	}
+}
+
+:8073 {
+	root * /srv/packs
+
+	# Liveness for the compose healthcheck; works before anything has been published.
+	respond /healthz "ok" 200
+
+	# pack.toml / index.toml: always revalidate (ETag / Last-Modified make that cheap),
+	# so a publish is visible to the next launch and no proxy serves a stale index.
+	@toml path *.toml
+	header @toml Content-Type "application/toml; charset=utf-8"
+	header @toml Cache-Control "no-cache"
+
+	# Mod jars may be cached. packwiz checks every file against the index hash anyway;
+	# a changed jar must get a new file name (the release flow already does this).
+	@jar path *.jar
+	header @jar Content-Type "application/java-archive"
+	header @jar Cache-Control "public, max-age=86400"
+
+	# Instance zips are versioned by file name.
+	@zip path *.zip
+	header @zip Content-Type "application/zip"
+	header @zip Cache-Control "public, max-age=86400"
+
+	@html path */ *.html
+	header @html Cache-Control "no-cache"
+
+	header X-Content-Type-Options "nosniff"
+
+	file_server {
+		hide .*
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

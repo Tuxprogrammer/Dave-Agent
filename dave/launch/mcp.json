@@ -1,0 +1,43 @@
+{
+  "_comment": "Template. dave_cmd.py fills in the placeholders, drops servers whose script does not exist yet, and passes the result via --mcp-config with --strict-mcp-config. Planned servers (recipes, bridge) are listed in dave/TOOLS.md, not here.",
+  "mcpServers": {
+    "dave-memory": {
+      "type": "stdio",
+      "command": "${PYTHON}",
+      "args": ["-I", "${APP}/dave/memory/server.py"],
+      "env": {
+        "DAVE_CONFIG": "${CONFIG}",
+        "DAVE_ROOT": "${ROOT}",
+        "DAVE_MEMORY_DIR": "${MEMORY}",
+        "DAVE_PACK_VERSION": "${PACK}",
+        "DAVE_MEMORY_ACTOR": "dave"
+      }
+    },
+    "gtnh-search": {
+      "type": "stdio",
+      "command": "${PYTHON}",
+      "args": ["-I", "${APP}/tools/gtnh-search/server.py"],
+      "env": {
+        "GTNH_SEARCH_ROOT": "${ROOT}",
+        "GTNH_SEARCH_DATA": "${CORPUS}",
+        "GTNH_SEARCH_INDEX_DIR": "${INDEX}",
+        "GTNH_SEARCH_STATE": "${SEARCH_STATE}",
+        "GTNH_MEMORY_DIR": "${MEMORY}",
+        "OPENROUTER_API_KEY_FILE": "${OPENROUTER_KEY_FILE}"
+      }
+    },
+    "living-wiki": {
+      "type": "stdio",
+      "command": "${PYTHON}",
+      "args": ["-I", "${APP}/tools/living-wiki/server.py"],
+      "env": {
+        "GTNH_SEARCH_ROOT": "${ROOT}",
+        "GTNH_SEARCH_DATA": "${CORPUS}",
+        "GTNH_SEARCH_INDEX_DIR": "${INDEX}",
+        "GTNH_SEARCH_STATE": "${SEARCH_STATE}",
+        "GTNH_MEMORY_DIR": "${MEMORY}",
+        "OPENROUTER_API_KEY_FILE": "${OPENROUTER_KEY_FILE}"
+      }
+    }
+  }
+}

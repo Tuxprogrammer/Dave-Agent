@@ -1,0 +1,76 @@
+# Dave's runtime configuration. Read by dave/config.py (dave_cmd.py, the dave-memory server, the daemon).
+#
+# Every value can be overridden by an environment variable (listed beside it), so the same file works in
+# this dev repo and in the production container. Secrets never go in this file: see [secrets].
+#
+# Path rules:
+#   [paths] entries are data locations. Relative values resolve against the data root:
+#           DAVE_ROOT, default = the directory that contains dave/ (this repo in dev).
+#   [prompt] entries are code/doc files that ship with the app. Relative values resolve against the app
+#           directory (where this dave/ package lives), whatever DAVE_ROOT says.
+#   "~" expands to the invoking user's home.
+
+[pack]
+version = "2.9.0"                          # DAVE_PACK_VERSION. Playbook entries from other versions read as stale.
+
+[model]
+name = "sonnet"                            # DAVE_MODEL. Alias ("sonnet", "opus", "haiku") or a full model id.
+fallback = ""                              # DAVE_FALLBACK_MODEL. e.g. "haiku"; empty = none.
+effort = ""                                # DAVE_EFFORT. low|medium|high|xhigh|max; empty = CLI default.
+planner = "opus"                           # DAVE_PLANNER_MODEL. The recipe-planner subagent (long chains, factory designs).
+
+[session]
+# Read by the daemon (dave/daemon/). Persistent memory bridges rotations.
+rotate_turns = 40
+rotate_hours = 6
+default_target = "reply"                   # When Dave gives no directive: "reply" = public to the whole server, addressed to the asker
+turn_timeout_seconds = 600                 # a turn (planner included) longer than this is abandoned and the session restarted
+followup_timeout_seconds = 900             # how long to hold the queue for a background planner's follow-up answer
+cooldown_seconds = 4                       # a player's asks closer together than this get a "one at a time" notice
+max_per_player = 2                         # questions one player may have waiting (in flight included)
+max_queue = 10                             # questions waiting in total before new ones are turned away
+stale_seconds = 300                        # a question that waited this long while the bridge was down is dropped,
+                                           # with a notice. Time spent behind Dave's earlier turns does not count.
+
+[paths]
+gtnh_src    = "gtnh-src"                   # DAVE_GTNH_SRC     read-only source tree
+corpus      = "data/corpus"                # DAVE_CORPUS_DIR   read-only search corpus
+index       = "data/index"                 # DAVE_INDEX_DIR    search indexes
+memory      = "data/memory"                # DAVE_MEMORY_DIR   Dave's memories (a volume in production)
+claude_home = "dave/.claude-home"          # DAVE_CLAUDE_HOME  CLAUDE_CONFIG_DIR and HOME for Dave's claude (git-ignored)
+run         = "dave/.run"                  # DAVE_RUN_DIR      rendered prompt/settings/mcp files, logs (git-ignored)
+workdir     = "/tmp/dave-agent/work"      # DAVE_WORKDIR  Dave's empty cwd. MUST be outside this repo AND the owner's home
+logs        = "dave/.run/daemon"           # DAVE_LOG_DIR      the daemon's turns.jsonl and daemon.log. Production: a volume,
+                                           #                   e.g. /dave/data/logs (the run dir is tmpfs there)
+
+[prompt]
+soul        = "dave/soul/SOUL.md"          # DAVE_SOUL
+planner     = "dave/soul/recipe-planner.md"  # DAVE_PLANNER_PROMPT  the recipe-planner subagent's prompt
+markup_spec = "DaveBridge/docs/dave-markup.md"  # DAVE_MARKUP_SPEC  the "DaveBridge markup spec" include (whole file)
+
+[claude]
+bin = "claude"                             # DAVE_CLAUDE_BIN   resolved on PATH when not absolute
+
+[search]
+# Writable state shared by the gtnh-search and living-wiki servers (corpus, index, wiki-git, review queue).
+# Empty in dev: both use the corpus and index paths above, and the wiki repo at data/wiki-git.
+# Production: the volume, e.g. /dave/data/state. The baked corpus/index above then act as the read-only seed.
+state = ""                                 # DAVE_SEARCH_STATE
+
+[bridge]
+# Used by the daemon. Dev: the local runServer. Production: the stack's internal network, e.g. ws://gtnh:25580
+url = "ws://127.0.0.1:25580"               # DAVE_BRIDGE_URL
+ping_seconds = 30                          # keepalive; a server tick that stops advancing between pings is logged
+missed_pings = 3                           # this many unanswered pings in a row drop the connection and reconnect
+
+[logs]
+# The daemon's turns.jsonl and daemon.log (in [paths] logs) rotate by size.
+max_mb = 10                                # rotate a file when it reaches this size
+keep = 5                                   # rotated copies kept per file (turns.jsonl.1 ... .5)
+
+[secrets]
+# Names only. Each secret is looked up, in order: env var NAME, a file named by env var NAME_FILE,
+# /run/secrets/<docker_secret>, then (outside a container only) the dev .env file listed here.
+claude_oauth_token = { env = "CLAUDE_CODE_OAUTH_TOKEN", docker_secret = "claude_oauth_token", dev_env_file = "dave/.env" }
+openrouter_api_key = { env = "OPENROUTER_API_KEY",      docker_secret = "openrouter_api_key", dev_env_file = ".env" }
+bridge_token       = { env = "DAVE_BRIDGE_TOKEN",       docker_secret = "dave_token",         dev_env_file = "dave/.env" }

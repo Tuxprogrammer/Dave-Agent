@@ -1,0 +1,43 @@
+# tuxmine pack host: merge BY HAND into /opt/gtnh/docker-compose.yaml (see DEPLOY.md).
+# Not a standalone compose file. Only the keys shown change; keep everything else as it is.
+#
+# Files next to the compose file:
+#   /opt/gtnh/Caddyfile   <- tuxmine/deploy/Caddyfile
+#   /opt/gtnh/packs/      <- publish target (tuxmine/scripts/publish.sh)
+# No secrets, no certificates: TLS for https://pack.example.net/ ends at Nginx Proxy Manager
+# on the router, which proxies to http://<desktop>:8073.
+
+services:
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    restart: unless-stopped
+    ports:
+      - "8073:8073"          # plain HTTP; NPM on the router must reach it. Nothing on 80/443.
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./packs:/srv/packs:ro
+    read_only: true
+    tmpfs:
+      - /data                # Caddy's state dir: unused (no certificates), keep it off disk
+      - /config
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]   # the caddy binary carries this file capability; it won't exec without it
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8073/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  gtnh_2:
+    environment:
+      # ADD (inside the stack network, same port, plain HTTP):
+      # The pack token (tuxmine/deploy/secrets/pack-token) goes in /opt/gtnh/.env as
+      # TUXMINE_PACK_TOKEN=..., like RCON_PASSWORD, so this file never holds it.
+      PACKWIZ_URL: "http://caddy:8073/${TUXMINE_PACK_TOKEN:?set TUXMINE_PACK_TOKEN in /opt/gtnh/.env}/server/pack.toml"
+      # REMOVE the whole MODS entry (DiscordIntegration + JourneyMap Unlimited URLs);
+      # both now come from the server pack. If `environment:` is a list in the real file,
+      # write `- PACKWIZ_URL=http://caddy:8073/${TUXMINE_PACK_TOKEN:?...}/server/pack.toml` instead.
+    depends_on:
+      caddy:
+        condition: service_healthy

@@ -1,0 +1,37 @@
+{
+  "_comment": "Template. dave_cmd.py fills in the placeholders with absolute paths and passes the result via --settings. Rule paths starting with // are absolute; Read rules also govern Grep and Glob. Keys starting with _ are stripped. The Agent tool exists only for recipe-planner: every built-in agent type is denied by name (dave_cmd.py --probe checks that no other type is reachable). See dave/TOOLS.md.",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "additionalDirectories": ["${GTNH_SRC}", "${CORPUS}"],
+    "allow": [
+      "Read(/${GTNH_SRC}/**)",
+      "Read(/${CORPUS}/**)",
+      "Grep",
+      "Glob",
+      "WebFetch(domain:wiki.gtnewhorizons.com)",
+      "mcp__dave-memory",
+      "mcp__gtnh-search",
+      "mcp__living-wiki",
+      "Agent(recipe-planner)", "Task(recipe-planner)"
+    ],
+    "deny": [
+      "Read(/${GTNH_SRC}/_decompiled/**)",
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebSearch",
+      "Agent(claude)", "Task(claude)",
+      "Agent(general-purpose)", "Task(general-purpose)",
+      "Agent(Explore)", "Task(Explore)",
+      "Agent(Plan)", "Task(Plan)",
+      "Agent(statusline-setup)", "Task(statusline-setup)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  },
+  "autoMemoryEnabled": false,
+  "cleanupPeriodDays": 30,
+  "pluginConfigs": {
+    "agents-md@builtin": {"options": {"instructionFiles": "managed-only"}}
+  }
+}

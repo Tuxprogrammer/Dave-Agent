@@ -1,0 +1,15 @@
+key.davebridge.ask=Ask Dave
+key.categories.davebridge=DaveBridge
+davebridge.config.client=Client
+davebridge.config.clientEvalAllowed=Let Dave run code on this computer
+davebridge.config.optInReminder=Remind me to opt in
+davebridge.config.askPrefix=Ask Dave prefix
+davebridge.optin.nudge=I can do a lot more if I can work with your game directly: see what you're looking at and what's open on your screen, set waypoints and NEI bookmarks for you, and track down lag or rendering glitches on your end. That means running code on your computer, so only say yes on servers you trust.
+davebridge.optin.button.yes=[Opt in]
+davebridge.optin.button.yes.hover=Let Dave run code on this computer. Undo any time with /davebridge optout.
+davebridge.optin.button.no=[No thanks]
+davebridge.optin.button.no.hover=Keep it off and stop asking. Change your mind with /davebridge optin.
+davebridge.optin.done=§aOpted in.§r %1$s can now work with your game directly. Undo any time with /davebridge optout.
+davebridge.optout.done=§7Opted out. %1$s won't run code on this computer, and you won't be asked again. Opt in any time with /davebridge optin.
+davebridge.optin.status.on=Opted in: %1$s may run code on this computer. Turn it off with /davebridge optout.
+davebridge.optin.status.off=Not opted in: %1$s can't run code on this computer. Turn it on with /davebridge optin.
