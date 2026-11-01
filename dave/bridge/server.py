@@ -156,7 +156,9 @@ TOOLS = [
             "{\"ghost\":{\"pos\":[x,y,z],\"block\":\"modid:name\",\"meta\"?:0,\"facing\"?:\"north\"}}, "
             "{\"swing\":true}, {\"say\":\"step text\"}, {\"wait\":ticks}. Limits: positions within 256 blocks "
             "of the player (32 for clients before DaveBridge 0.2.4) and in loaded chunks, at most 64 steps and 180 s per pass; unknown items or blocks are "
-            "dropped. Read the ack's warnings. The player defaults to the asker."
+            "dropped. The ghost appears in front of the player and walks from there on the route a mob would take, "
+            "so just walkTo the places to show (no starting walk, no waypoints). Read the ack's warnings. The "
+            "player defaults to the asker."
         ),
         "inputSchema": {
             "type": "object",

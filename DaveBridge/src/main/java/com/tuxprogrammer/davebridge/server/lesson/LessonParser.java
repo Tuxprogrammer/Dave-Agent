@@ -160,8 +160,9 @@ public final class LessonParser {
             }
         }
 
-        lesson.start = startPoint(steps, lesson.anchor, yaw);
+        lesson.start = startPoint(lesson.anchor, yaw, env);
         steps = route(steps, lesson.start, env, warnings);
+        lesson.speed = fitSpeed(steps, lesson.start, lesson.speed, warnings);
         // Time every step; drop what doesn't fit in one pass.
         double[] at = lesson.start;
         int total = 0;
@@ -457,16 +458,53 @@ public final class LessonParser {
     }
 
     /**
-     * Where the ghost appears: on the first waypoint if the lesson starts by walking, otherwise two blocks in front
-     * of the player.
+     * Where the ghost appears: always with the player, two blocks in front of them (where they're looking), so every
+     * walk starts from the player, even to a far target. When that spot is inside a wall, the closest spot a mob can
+     * walk to from the player's feet; when they're boxed in, their feet.
      */
-    static double[] startPoint(List<Lesson.Step> steps, double[] anchor, float yaw) {
-        if (!steps.isEmpty() && Lesson.WALK_TO.equals(steps.get(0).op)) {
-            double[] p = steps.get(0).pos;
-            return new double[] { p[0], p[1], p[2] };
-        }
+    static double[] startPoint(double[] anchor, float yaw, Env env) {
         double rad = Math.toRadians(yaw);
-        return new double[] { anchor[0] - Math.sin(rad) * 2.0, anchor[1], anchor[2] + Math.cos(rad) * 2.0 };
+        double[] front = { anchor[0] - Math.sin(rad) * 2.0, anchor[1], anchor[2] + Math.cos(rad) * 2.0 };
+        MobPath.Route r = env.route(anchor, front);
+        if (r == null || r.reached) return front;
+        if (r.points.isEmpty()) return anchor.clone();
+        double[] p = r.points.get(r.points.size() - 1);
+        return new double[] { p[0], p[1], p[2] };
+    }
+
+    /**
+     * Raises the walking speed (up to {@link LessonLimits#MAX_SPEED}) when the walks would push a pass past
+     * {@link LessonLimits#MAX_PASS_TICKS}: a far target means a long walk from the player, and the steps at the end of
+     * it (the highlight, the point) are the ones that matter.
+     */
+    static double fitSpeed(List<Lesson.Step> steps, double[] start, double speed, List<String> warnings) {
+        double walked = 0;
+        int other = 0;
+        double[] at = start;
+        for (Lesson.Step step : steps) {
+            if (Lesson.WALK_TO.equals(step.op)) {
+                walked += distance(at, step.pos);
+                at = step.pos;
+            } else {
+                other += duration(step, at, speed);
+            }
+        }
+        int walkTicks = (int) Math.ceil(walked / (LessonLimits.WALK_BLOCKS_PER_TICK * speed));
+        if (walkTicks + other <= LessonLimits.MAX_PASS_TICKS || other >= LessonLimits.MAX_PASS_TICKS) return speed;
+        // Margin for each walk step rounding up to whole ticks.
+        double room = LessonLimits.MAX_PASS_TICKS - other - steps.size();
+        double needed = room <= 0 ? LessonLimits.MAX_SPEED : walked / (LessonLimits.WALK_BLOCKS_PER_TICK * room);
+        double faster = LessonLimits.clampSpeed(Math.max(speed, needed * 1.02));
+        warnings.add(
+            "the walks are " + fmt(walked)
+                + " blocks; Dave walks at speed "
+                + fmt(faster)
+                + " instead of "
+                + fmt(speed)
+                + " so the pass fits in "
+                + LessonLimits.MAX_PASS_TICKS / 20
+                + " s");
+        return faster;
     }
 
     static double distance(double[] a, double[] b) {

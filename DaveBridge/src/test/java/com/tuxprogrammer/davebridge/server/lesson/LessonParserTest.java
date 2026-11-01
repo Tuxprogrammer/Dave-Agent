@@ -74,9 +74,9 @@ class LessonParserTest {
         assertEquals(0.6, l.speed, 1e-9);
         assertEquals(8, l.steps.length);
         assertArrayEquals(ANCHOR, l.anchor);
-        // Starts by walking: Dave appears on the first waypoint, so that step takes one tick.
-        assertArrayEquals(new double[] { 102, 64, -18 }, l.start);
-        assertEquals(1, l.steps[0].ticks);
+        // Dave appears in front of the player (yaw 0 faces +z) and walks to the first waypoint from there.
+        assertArrayEquals(new double[] { 100.5, 64, -18.5 }, l.start, 1e-9);
+        assertEquals(LessonLimits.walkTicks(Math.hypot(1.5, 0.5), 0.6), l.steps[0].ticks);
 
         Lesson.Step hold = l.steps[2];
         assertEquals("gregtech:gt.metatool.01", hold.id);
@@ -374,5 +374,54 @@ class LessonParserTest {
             env);
         assertEquals(4, r.lesson.steps.length);
         assertEquals(115.0, r.lesson.steps[2].pos[0], "the walk still ends at the target");
+    }
+
+    @Test
+    void aFarFirstWalkStartsWithThePlayer() {
+        LessonParser.Result r = parse(steps("{\"walkTo\":[100.5,64,150.5]}", "{\"swing\":true}"));
+        assertArrayEquals(new double[] { 100.5, 64, -18.5 }, r.lesson.start, 1e-9);
+        assertEquals(LessonLimits.walkTicks(169, 0.6), r.lesson.steps[0].ticks);
+    }
+
+    @Test
+    void theStartStepsAroundAWallInFrontOfThePlayer() {
+        LessonParser.Env wall = new FakeEnv() {
+
+            @Override
+            public MobPath.Route route(double[] from, double[] to) {
+                return new MobPath.Route(java.util.Collections.singletonList(new double[] { 101.5, 64, -19.5 }), false);
+            }
+        };
+        LessonParser.Result r = LessonParser
+            .parse(new JsonParser().parse(steps("{\"swing\":true}")), ANCHOR, 0f, 0, wall);
+        assertArrayEquals(new double[] { 101.5, 64, -19.5 }, r.lesson.start, 1e-9);
+
+        LessonParser.Env boxed = new FakeEnv() {
+
+            @Override
+            public MobPath.Route route(double[] from, double[] to) {
+                return new MobPath.Route(java.util.Collections.<double[]>emptyList(), false);
+            }
+        };
+        r = LessonParser.parse(new JsonParser().parse(steps("{\"swing\":true}")), ANCHOR, 0f, 0, boxed);
+        assertArrayEquals(ANCHOR, r.lesson.start, 1e-9);
+    }
+
+    @Test
+    void longWalksSpeedUpToFitThePass() {
+        LessonParser.Result r = parse(
+            steps(
+                "{\"walkTo\":[100.5,64,200.5]}",
+                "{\"walkTo\":[100.5,64,-49.5]}",
+                "{\"walkTo\":[100.5,64,200.5]}",
+                "{\"say\":\"here\"}"));
+        assertEquals(0, r.dropped, r.warnings.toString());
+        assertEquals(4, r.lesson.steps.length);
+        assertTrue(r.lesson.speed > 0.6);
+        assertTrue(r.passTicks <= LessonLimits.MAX_PASS_TICKS);
+        assertTrue(
+            r.warnings.stream()
+                .anyMatch(w -> w.contains("Dave walks at speed")),
+            r.warnings.toString());
     }
 }

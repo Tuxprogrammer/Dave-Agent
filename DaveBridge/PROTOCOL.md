@@ -246,7 +246,7 @@ player stops it. Nothing in the world changes. Design: `docs/plans/guided-demos.
 
 | Step | Argument | Does | Ticks |
 |---|---|---|---|
-| `walkTo` | `[x,y,z]` (feet position) | Walks in a straight line from where he is. Send waypoints (e.g. from vanilla's pathfinder) for a route; the client interpolates between them. | distance / speed |
+| `walkTo` | `[x,y,z]` (feet position) | Walks there from where he is. The server replaces the walk with the route a mob would walk (a `walkTo` per turn); the client interpolates between them. | distance / speed |
 | `lookAt` | `[x,y,z]` | Turns head and body to the point and points at it with his right arm. | 15 |
 | `hold` | `"modid:name[:meta]"` (also `@meta`), or `""` / `null` for empty hands | Holds the item. Until the first `hold`, Dave holds GregGuns' Golden Revolver if the player has GregGuns. | 10 |
 | `highlight` | `{"pos":[x,y,z],"color":..,"label":..}` or just `[x,y,z]` | Pulsing colored box on the block (outline visible through walls), label above it; Dave looks and points. `color`: a chat color name (`gold` default, `red`, `green`, `aqua`, ... plus `orange`, `pink`, `cyan`, `lime`, `purple`) or `#rrggbb`. `label` up to 80 characters. | 25 |
@@ -266,7 +266,10 @@ Validation (on the server thread):
 - At most **64 steps**; one pass at most **180 s** (3600 ticks).
 - An invalid or unknown step (or extra keys) is dropped (or ignored) with a warning; the rest still plays. Text loses
   `§` codes and control characters.
-- Dave appears on the first waypoint if the lesson starts with `walkTo`, otherwise two blocks in front of the player.
+- Dave appears with the player, two blocks in front of them (the closest spot a mob can walk to when that is inside a
+  wall), so every walk, even the first, starts from the player.
+- When the walks would make a pass longer than 180 s, the server raises `speed` (up to 2) so the pass fits, with a
+  warning.
 
 Reply:
 
