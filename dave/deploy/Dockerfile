@@ -39,6 +39,8 @@ COPY --chown=root:root gtnh-src/ /dave/ro/gtnh-src/
 COPY --chown=root:root data/index/ /dave/ro/index/
 COPY --chown=root:root data/corpus/ /dave/ro/corpus/
 COPY --chown=root:root data/memory/ /dave/seed/memory/
+# Recipe database exported from our own pack (tools/recipe-export, tools/recipes/build_db.py).
+COPY --chown=root:root data/recipes.sqlite /dave/ro/recipes.sqlite
 
 # Optional Python dependencies of tools (the recipe planner's HiGHS). Everything else is standard library only.
 COPY tools/ /dave/app/tools/
@@ -56,6 +58,7 @@ ENV DAVE_CONTAINER=1 \
     DAVE_GTNH_SRC=/dave/ro/gtnh-src \
     DAVE_CORPUS_DIR=/dave/ro/corpus \
     DAVE_INDEX_DIR=/dave/ro/index \
+    DAVE_RECIPES_DB=/dave/ro/recipes.sqlite \
     DAVE_MEMORY_DIR=/dave/data/memory \
     DAVE_LOG_DIR=/dave/data/logs \
     DAVE_SEARCH_STATE=/dave/data/state \

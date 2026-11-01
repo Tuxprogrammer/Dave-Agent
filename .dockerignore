@@ -5,6 +5,7 @@
 !data/corpus/
 !data/index/
 !data/memory/
+!data/recipes.sqlite
 !gtnh-src/
 !DaveBridge/PROTOCOL.md
 !DaveBridge/docs/dave-markup.md
