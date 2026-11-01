@@ -133,7 +133,7 @@ public final class LessonPlayback {
 
     /**
      * Keeps the well-formed steps: known op, finite positions within reach of the anchor, bounded text and ticks,
-     * at most {@link LessonLimits#MAX_STEPS} and one pass of at most {@link LessonLimits#MAX_PASS_TICKS}.
+     * at most {@link LessonLimits#MAX_PLAYED_STEPS} and one pass of at most {@link LessonLimits#MAX_PASS_TICKS}.
      */
     static Lesson.Step[] sanitize(Lesson.Step[] in, double[] anchor) {
         if (in == null) {
@@ -142,7 +142,7 @@ public final class LessonPlayback {
         List<Lesson.Step> out = new ArrayList<>();
         int total = 0;
         for (Lesson.Step s : in) {
-            if (out.size() >= LessonLimits.MAX_STEPS) break;
+            if (out.size() >= LessonLimits.MAX_PLAYED_STEPS) break;
             if (s == null || s.op == null) continue;
             switch (s.op) {
                 case Lesson.WALK_TO:

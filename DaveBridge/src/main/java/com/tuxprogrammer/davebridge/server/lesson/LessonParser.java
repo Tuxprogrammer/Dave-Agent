@@ -1,6 +1,7 @@
 package com.tuxprogrammer.davebridge.server.lesson;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -45,6 +46,16 @@ public final class LessonParser {
         /** How far from the player positions may be: the player's client decides (older ones play less). */
         default double maxRadius() {
             return LessonLimits.MAX_RADIUS;
+        }
+
+        /** How many steps the player's client plays once walks are routed. */
+        default int maxSteps() {
+            return LessonLimits.MAX_PLAYED_STEPS;
+        }
+
+        /** A mob's walking route between two feet positions ({@link MobPath}), or null to walk straight. */
+        default MobPath.Route route(double[] from, double[] to) {
+            return null;
         }
     }
 
@@ -150,6 +161,7 @@ public final class LessonParser {
         }
 
         lesson.start = startPoint(steps, lesson.anchor, yaw);
+        steps = route(steps, lesson.start, env, warnings);
         // Time every step; drop what doesn't fit in one pass.
         double[] at = lesson.start;
         int total = 0;
@@ -181,6 +193,81 @@ public final class LessonParser {
         }
         lesson.steps = timed.toArray(new Lesson.Step[0]);
         return new Result(lesson, null, warnings, dropped, total);
+    }
+
+    /**
+     * Replaces each straight walk with the route a mob would walk (a walk step per turn), so Dave doesn't walk through
+     * walls. When no mob could get there, the walk ends at the closest point one can reach. Routes are thinned to fit
+     * the steps the player's client plays.
+     */
+    static List<Lesson.Step> route(List<Lesson.Step> steps, double[] start, Env env, List<String> warnings) {
+        List<List<double[]>> turns = new ArrayList<>();
+        double[] at = start;
+        int extra = 0;
+        for (Lesson.Step step : steps) {
+            List<double[]> mids = Collections.emptyList();
+            if (Lesson.WALK_TO.equals(step.op)) {
+                MobPath.Route r = env.route(at, step.pos);
+                if (r != null && !r.points.isEmpty()) {
+                    mids = new ArrayList<>(r.points.subList(0, r.points.size() - 1));
+                    if (!r.reached) {
+                        double[] end = r.points.get(r.points.size() - 1);
+                        warnings.add(
+                            "no walking route reaches " + fmt(step.pos[0])
+                                + ","
+                                + fmt(step.pos[1])
+                                + ","
+                                + fmt(step.pos[2])
+                                + "; Dave stops "
+                                + fmt(distance(end, step.pos))
+                                + " blocks short, at "
+                                + fmt(end[0])
+                                + ","
+                                + fmt(end[1])
+                                + ","
+                                + fmt(end[2]));
+                        step.pos = end;
+                    }
+                } else if (r == null && distance(at, step.pos) > 2) {
+                    warnings.add(
+                        "could not route the walk to " + fmt(step.pos[0])
+                            + ","
+                            + fmt(step.pos[1])
+                            + ","
+                            + fmt(step.pos[2])
+                            + "; Dave walks there in a straight line");
+                }
+                at = step.pos;
+            }
+            turns.add(mids);
+            extra += mids.size();
+        }
+        int room = Math.max(0, env.maxSteps() - steps.size());
+        if (extra > room) {
+            warnings.add(
+                "the routes have " + extra
+                    + " turns; kept "
+                    + room
+                    + " (the player's client plays at most "
+                    + env.maxSteps()
+                    + " steps)");
+        }
+        List<Lesson.Step> out = new ArrayList<>();
+        for (int i = 0; i < steps.size(); i++) {
+            Lesson.Step step = steps.get(i);
+            List<double[]> mids = turns.get(i);
+            int keep = extra > room ? (int) ((long) mids.size() * room / extra) : mids.size();
+            for (int j = 0; j < keep; j++) {
+                // Evenly spaced through the route when it has to be thinned.
+                double[] p = mids.get(keep == mids.size() ? j : (int) ((long) (j + 1) * mids.size() / (keep + 1)));
+                Lesson.Step walk = new Lesson.Step();
+                walk.op = Lesson.WALK_TO;
+                walk.pos = p;
+                out.add(walk);
+            }
+            out.add(step);
+        }
+        return out;
     }
 
     private static Result fail(String error, List<String> warnings) {

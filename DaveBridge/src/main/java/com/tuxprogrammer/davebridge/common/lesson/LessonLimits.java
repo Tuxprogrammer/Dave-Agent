@@ -6,8 +6,15 @@ package com.tuxprogrammer.davebridge.common.lesson;
  */
 public final class LessonLimits {
 
-    /** Most steps one lesson may keep; later steps are dropped with a warning. */
+    /** Most steps the agent may write in one lesson; later steps are dropped with a warning. */
     public static final int MAX_STEPS = 64;
+    /**
+     * Most steps a lesson may have once the server has routed its walks (each turn of a mob's path is a walk step).
+     * Clients from {@link #ROUTE_VERSION} play this many; older ones stop at {@link #MAX_STEPS}.
+     */
+    public static final int MAX_PLAYED_STEPS = 256;
+    /** The first client version that plays {@link #MAX_PLAYED_STEPS} steps. */
+    public static final String ROUTE_VERSION = "0.2.5";
     /** Longest single pass of a lesson, in ticks (3 minutes). Steps past it are dropped with a warning. */
     public static final int MAX_PASS_TICKS = 3 * 60 * 20;
     /**
@@ -51,6 +58,11 @@ public final class LessonLimits {
     /** The radius a client of this DaveBridge version plays lessons in; unknown versions get the legacy radius. */
     public static double radiusFor(String clientVersion) {
         return compareVersions(clientVersion, RADIUS_VERSION) >= 0 ? MAX_RADIUS : LEGACY_RADIUS;
+    }
+
+    /** How many steps a client of this DaveBridge version plays. */
+    public static int stepsFor(String clientVersion) {
+        return compareVersions(clientVersion, ROUTE_VERSION) >= 0 ? MAX_PLAYED_STEPS : MAX_STEPS;
     }
 
     /** Compares dotted numeric versions ("0.2.10" > "0.2.9"); a suffix like "-dev" is ignored; null is lowest. */

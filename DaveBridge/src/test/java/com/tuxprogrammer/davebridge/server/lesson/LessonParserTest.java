@@ -315,4 +315,64 @@ class LessonParserTest {
         assertEquals(1, r.lesson.steps.length);
         assertEquals(1, r.dropped);
     }
+
+    @Test
+    void walksFollowTheMobRouteAndPartialRoutesStopShort() {
+        LessonParser.Env env = new FakeEnv() {
+
+            @Override
+            public MobPath.Route route(double[] from, double[] to) {
+                // Around a wall: two turns, then the target, which is out of reach for the second walk.
+                if (to[2] < -35) {
+                    return new MobPath.Route(
+                        java.util.Arrays
+                            .asList(new double[] { from[0], 64, -30.5 }, new double[] { from[0] + 3, 64, -30.5 }),
+                        false);
+                }
+                return new MobPath.Route(
+                    java.util.Arrays.asList(new double[] { 105.5, 64, -15.5 }, new double[] { 108.5, 64, -15.5 }, to),
+                    true);
+            }
+        };
+        LessonParser.Result r = LessonParser.parse(
+            new JsonParser().parse(steps("{\"walkTo\":[110,64,-10]}", "{\"walkTo\":[110,64,-40]}")),
+            ANCHOR,
+            0f,
+            0,
+            env);
+        // walk 1: two turns + the target; walk 2: one turn + the closest point
+        assertEquals(5, r.lesson.steps.length);
+        assertEquals(-30.5, r.lesson.steps[4].pos[2]);
+        assertTrue(
+            r.warnings.stream()
+                .anyMatch(w -> w.contains("no walking route reaches")),
+            r.warnings.toString());
+    }
+
+    @Test
+    void routesAreThinnedForOlderClients() {
+        LessonParser.Env env = new FakeEnv() {
+
+            @Override
+            public int maxSteps() {
+                return 4;
+            }
+
+            @Override
+            public MobPath.Route route(double[] from, double[] to) {
+                java.util.List<double[]> pts = new java.util.ArrayList<>();
+                for (int i = 1; i <= 10; i++) pts.add(new double[] { 100.5 + i, 64, -20.5 });
+                pts.add(to);
+                return new MobPath.Route(pts, true);
+            }
+        };
+        LessonParser.Result r = LessonParser.parse(
+            new JsonParser().parse(steps("{\"walkTo\":[115,64,-20]}", "{\"say\":\"here\"}")),
+            ANCHOR,
+            0f,
+            0,
+            env);
+        assertEquals(4, r.lesson.steps.length);
+        assertEquals(115.0, r.lesson.steps[2].pos[0], "the walk still ends at the target");
+    }
 }

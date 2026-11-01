@@ -6,8 +6,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.block.Block;
+import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
+import net.minecraft.pathfinding.PathFinder;
+import net.minecraft.pathfinding.PathPoint;
+import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 
 import com.google.gson.JsonArray;
@@ -181,15 +185,68 @@ public final class LessonService {
     }
 
     /** World and registry lookups for the parser. Server thread only. */
+    /** A mob-sized body (0.6 x 1.8, vanilla's PathPoint size 1 x 2 x 1) for vanilla's stand check. */
+    private static final PathPoint MOB_SIZE = new PathPoint(1, 2, 1);
+
+    /** Never spawned: only its world and position are read, by vanilla's canEntityStandAt. */
+    private static final class Probe extends EntityLiving {
+
+        Probe(World world) {
+            super(world);
+            setSize(0.6F, 1.8F);
+        }
+    }
+
+    /**
+     * Vanilla's mob walkability on the player's world, for loaded chunks only: doors count as passable (the player
+     * can open them), water is swum, lava is avoided.
+     */
+    static MobPath.Grid grid(WorldServer world, EntityPlayerMP player) {
+        Probe probe = new Probe(world);
+        probe.setPosition(player.posX, player.posY, player.posZ);
+        return new MobPath.Grid() {
+
+            @Override
+            public int stand(int x, int y, int z) {
+                if (y < 0 || y > 255) return y < 0 ? 0 : 1;
+                // PathFinder.canEntityStandAt, the static one (unnamed in the dev mappings)
+                return PathFinder.func_82565_a(probe, x, y, z, MOB_SIZE, false, true, true);
+            }
+
+            @Override
+            public boolean loaded(int x, int z) {
+                return world.theChunkProviderServer.chunkExists(x >> 4, z >> 4);
+            }
+
+            @Override
+            public int maxFall() {
+                return 3; // vanilla getMaxFallHeight for a mob with no attack target
+            }
+        };
+    }
+
     static LessonParser.Env env(EntityPlayerMP player) {
         WorldServer world = player.getServerForPlayer();
         ClientModTracker.Info client = DaveServer.CLIENTS.get(player.getUniqueID());
-        double radius = LessonLimits.radiusFor(client == null ? null : client.modVersion);
+        String version = client == null ? null : client.modVersion;
+        double radius = LessonLimits.radiusFor(version);
+        int steps = LessonLimits.stepsFor(version);
+        MobPath.Grid grid = world == null ? null : grid(world, player);
         return new LessonParser.Env() {
 
             @Override
             public double maxRadius() {
                 return radius;
+            }
+
+            @Override
+            public int maxSteps() {
+                return steps;
+            }
+
+            @Override
+            public MobPath.Route route(double[] from, double[] to) {
+                return grid == null ? null : MobPath.find(grid, from, to, MobPath.NODE_BUDGET);
             }
 
             @Override

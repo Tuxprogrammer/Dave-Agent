@@ -3,8 +3,11 @@ package com.tuxprogrammer.davebridge.client.lesson;
 import java.util.UUID;
 
 import net.minecraft.client.entity.EntityOtherPlayerMP;
+import net.minecraft.client.model.ModelBiped;
+import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.entity.RenderBiped;
 import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemBlock;
@@ -47,6 +50,107 @@ public class GhostDaveRenderer extends RenderBiped {
     public GhostDaveRenderer() {
         super(new GhostDaveModel(), 0.0F);
         setRenderManager(RenderManager.instance);
+        ((PosedArmorModel) field_82423_g).source = (ModelBiped) mainModel;
+        ((PosedArmorModel) field_82425_h).source = (ModelBiped) mainModel;
+    }
+
+    /**
+     * The armor layers take Dave's own pose. Vanilla poses each armor model with its own ModelBiped math, so while
+     * Dave points or carries his gun the vest's sleeve would hang at vanilla's angle and his arm would show through
+     * it. Called from RenderBiped's constructor, before this class's fields are set.
+     */
+    // Same fix as GregGuns' NPCs (D310): client/mob/RenderDataBiped.func_82421_b and client/mob/ArmorPose.
+    @Override
+    protected void func_82421_b() {
+        field_82423_g = new PosedArmorModel(1.0F);
+        field_82425_h = new PosedArmorModel(0.5F);
+    }
+
+    /** A vanilla armor layer that copies the ghost's pose after vanilla posed it. */
+    static final class PosedArmorModel extends ModelBiped {
+
+        ModelBiped source;
+
+        PosedArmorModel(float inflate) {
+            super(inflate);
+        }
+
+        @Override
+        public void setRotationAngles(float limbSwing, float limbSwingAmount, float age, float headYaw, float headPitch,
+            float scale, Entity entity) {
+            super.setRotationAngles(limbSwing, limbSwingAmount, age, headYaw, headPitch, scale, entity);
+            if (source != null) copyPose(source, this);
+        }
+    }
+
+    /** Copies the six biped parts' angles and pivots, and the head onto the headwear. */
+    static void copyPose(ModelBiped from, ModelBiped to) {
+        copyPart(from.bipedHead, to.bipedHead);
+        copyPart(from.bipedHead, to.bipedHeadwear);
+        copyPart(from.bipedBody, to.bipedBody);
+        copyPart(from.bipedRightArm, to.bipedRightArm);
+        copyPart(from.bipedLeftArm, to.bipedLeftArm);
+        copyPart(from.bipedRightLeg, to.bipedRightLeg);
+        copyPart(from.bipedLeftLeg, to.bipedLeftLeg);
+    }
+
+    private static void copyPart(ModelRenderer from, ModelRenderer to) {
+        to.rotateAngleX = from.rotateAngleX;
+        to.rotateAngleY = from.rotateAngleY;
+        to.rotateAngleZ = from.rotateAngleZ;
+        to.rotationPointX = from.rotationPointX;
+        to.rotationPointY = from.rotationPointY;
+        to.rotationPointZ = from.rotationPointZ;
+    }
+
+    /**
+     * GregGuns' own armor models (the beret, box armor) follow GregGuns' ArmorPose source instead: while the ghost is
+     * drawn, that source is Dave's model. Soft dependency through reflection; without GregGuns this does nothing.
+     */
+    @Override
+    public void doRender(EntityLiving entity, double x, double y, double z, float yaw, float partial) {
+        boolean posing = GregGunsArmorPose.begin((ModelBiped) mainModel);
+        try {
+            super.doRender(entity, x, y, z, yaw, partial);
+        } finally {
+            if (posing) GregGunsArmorPose.end();
+        }
+    }
+
+    /** Reflective access to com.gregguns.client.mob.ArmorPose begin/end; looked up once. */
+    static final class GregGunsArmorPose {
+
+        private static boolean looked;
+        private static java.lang.reflect.Method begin, end;
+
+        static boolean begin(ModelBiped model) {
+            if (!looked) {
+                looked = true;
+                try {
+                    Class<?> c = Class.forName("com.gregguns.client.mob.ArmorPose");
+                    begin = c.getMethod("begin", ModelBiped.class);
+                    end = c.getMethod("end");
+                } catch (ReflectiveOperationException | LinkageError e) {
+                    begin = end = null;
+                }
+            }
+            if (begin == null) return false;
+            try {
+                begin.invoke(null, model);
+                return true;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                begin = end = null;
+                return false;
+            }
+        }
+
+        static void end() {
+            try {
+                if (end != null) end.invoke(null);
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                begin = end = null;
+            }
+        }
     }
 
     @Override

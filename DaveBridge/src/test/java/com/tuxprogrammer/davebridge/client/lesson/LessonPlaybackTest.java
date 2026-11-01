@@ -166,9 +166,9 @@ class LessonPlaybackTest {
 
     @Test
     void sanitizeCapsStepCount() {
-        Lesson.Step[] many = new Lesson.Step[LessonLimits.MAX_STEPS * 2];
+        Lesson.Step[] many = new Lesson.Step[LessonLimits.MAX_PLAYED_STEPS * 2];
         for (int i = 0; i < many.length; i++) many[i] = step(Lesson.SWING, 1);
-        assertEquals(LessonLimits.MAX_STEPS, LessonPlayback.sanitize(many, new double[] { 0, 0, 0 }).length);
+        assertEquals(LessonLimits.MAX_PLAYED_STEPS, LessonPlayback.sanitize(many, new double[] { 0, 0, 0 }).length);
     }
 
     @Test
