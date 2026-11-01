@@ -1,12 +1,12 @@
 name = "tuxmine-server"
 author = "Spencer Callicott"
-version = "0.1.10"
+version = "0.1.11"
 pack-format = "packwiz:1.1.0"
 
 [index]
 file = "index.toml"
 hash-format = "sha256"
-hash = "c53b32dcb4dbf3ec91d7e1858a5a512cc74aa8e1e16672a85c9f532501943aaf"
+hash = "87a1a11ae4093e98fe1bff32cf3c96ee2001d5e251dea0bde6123091209817c6"
 
 [versions]
 forge = "10.13.4.1614"
