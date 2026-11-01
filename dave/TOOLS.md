@@ -138,9 +138,35 @@ Exposed by the Dave daemon over the DaveBridge WebSocket (`DaveBridge/PROTOCOL.m
 | `eval(script, side="server" or "client", confirm?)` | Groovy in the live JVM on the main-thread queue. Anything that changes the world requires the player's in-game confirm; client side only for opted-in players |
 | saved queries (`query_run`, `query_save`) | Reusable named scripts that worked |
 | `list_players()` | Who is online |
+| `lesson(player, lesson)` | **Ready on the wire, tool not wired yet.** Show one player a guided demonstration ("show me"); see below |
+| `lesson_stop(player, id?)` | Stop that player's demonstration |
 
 To add it: an entry in `launch/mcp.json` (its transport is the daemon's choice) and an `mcp__bridge` allow
 rule.
+
+### `lesson` / `lesson_stop` (guided demonstrations; for whoever wires the `bridge` server)
+
+DaveBridge 0.2.0 handles the `lesson` and `lesson_stop` WebSocket requests and advertises them in `hello.accepts`
+(spec: `DaveBridge/PROTOCOL.md` 1.4 and 2.6; design: `docs/plans/guided-demos.md`). The daemon side exists:
+`Bridge.lesson(player, lesson)` and `Bridge.lesson_stop(player, lesson_id=None)` in `dave/daemon/main.py` return
+the server's reply, and `Daemon.lesson_capable` (uuids whose client half reported the `lesson` capability) and
+`Daemon.lesson_status` (uuid -> how their last lesson ended) are kept from events. The `bridge` MCP server (M2
+branch) only has to expose them:
+
+- `lesson(player: str, lesson: object)`: `lesson` is passed through unchanged:
+  `{"id"?: str, "title"?: str, "loop"?: bool = true, "speed"?: number = 0.6, "steps": [step, ...]}`, each step one
+  of `{"walkTo":[x,y,z]}`, `{"lookAt":[x,y,z]}`, `{"hold":"modid:name[:meta]" | ""}`,
+  `{"highlight":{"pos":[x,y,z],"color"?:"gold"|"#rrggbb","label"?:str}}`,
+  `{"ghost":{"pos":[x,y,z],"block":"modid:name","meta"?:int,"facing"?:"north"|...}}`, `{"swing":true}`,
+  `{"say":str}`, `{"wait":ticks}`. Return the ack (`id`, `steps`, `dropped`, `passTicks`, `warnings`) so Dave can
+  read the warnings, or the error. Put the limits in the tool description: positions within 32 blocks of the player
+  and in loaded chunks, at most 64 steps and 180 s per pass, items and blocks must exist.
+- `lesson_stop(player: str, id?: str)`: returns the ack.
+- On `no_client_mod` the player has no client half: Dave answers in chat (and may mention the client half).
+  Lessons don't need `clientEvalAllowed`; never ask for the opt-in for them.
+- Allow rule: `mcp__bridge__lesson`, `mcp__bridge__lesson_stop` (covered by `mcp__bridge`).
+- Optional context: put "can see demonstrations" (`lesson_capable`) in the envelope, and the latest
+  `lesson_status` (e.g. "stopped: walked_away") so Dave knows whether the player watched it.
 
 ## Adding a tool (checklist)
 
