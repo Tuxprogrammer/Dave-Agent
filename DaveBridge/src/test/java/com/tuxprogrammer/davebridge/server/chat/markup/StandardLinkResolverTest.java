@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.tuxprogrammer.davebridge.server.chat.TriggerMatcher;
 
 class StandardLinkResolverTest {
 
@@ -109,6 +110,35 @@ class StandardLinkResolverTest {
         ResolvedLink clientCmd = resolve("{send:bq_client show x|x}");
         assertEquals(ClickEvent.Action.SUGGEST_COMMAND, click(clientCmd).getAction());
         assertEquals(2, warnings.size());
+    }
+
+    @Test
+    void showIsAModOnlyButtonThatAsksDaveToShowIt() {
+        ResolvedLink show = resolve("{show:the nearest chest with titanium plates}");
+        assertEquals("", show.vanilla.getUnformattedText(), "players without the mod can't watch a demo");
+        assertTrue(
+            show.mod.getUnformattedText()
+                .contains("Show me in game"),
+            show.mod.getUnformattedText());
+        ClickEvent c = click(show.mod);
+        assertEquals(ClickEvent.Action.RUN_COMMAND, c.getAction());
+        assertEquals("dave, show me the nearest chest with titanium plates in game", c.getValue());
+        assertTrue(TriggerMatcher.match(c.getValue(), new String[] { "dave" }) != null);
+        assertEquals(0, warnings.size());
+    }
+
+    @Test
+    void showCutsLongTextToFitChat() {
+        String what = new String(new char[150]).replace("\0", "x");
+        ClickEvent c = click(resolve("{show:" + what + "|Watch}").mod);
+        assertTrue(
+            c.getValue()
+                .length() <= StandardLinkResolver.MAX_CHAT_LENGTH,
+            c.getValue());
+        assertTrue(
+            c.getValue()
+                .endsWith(" in game"));
+        assertEquals(1, warnings.size());
     }
 
     @Test

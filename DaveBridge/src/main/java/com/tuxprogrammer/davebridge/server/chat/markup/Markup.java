@@ -60,6 +60,7 @@ public final class Markup {
                 "cmd",
                 "suggest",
                 "send",
+                "show",
                 "hover",
                 "player",
                 "waypoint",

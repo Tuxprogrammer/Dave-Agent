@@ -123,8 +123,8 @@ public final class MarkupRenderer {
                     link = null;
                 }
                 if (link == null) {
-                    // unresolved: keep the readable part as plain styled text
-                    pieces.add(Piece.text(token.labelOrArg(), ChatStyles.apply(token.style, null)));
+                    // unresolved: keep the readable part as plain styled text; an item or fluid still reads as one
+                    pieces.add(Piece.text(token.labelOrArg(), ChatStyles.apply(token.style, unresolvedBase(token))));
                 } else {
                     pieces.add(Piece.atom(link));
                     actions.addAll(link.actions);
@@ -149,6 +149,19 @@ public final class MarkupRenderer {
             continued.add(line.continued);
         }
         return new Rendered(mod, vanilla, actions, warnings, continued);
+    }
+
+    /** Item and fluid links that did not resolve keep the item green, so the name still stands out. */
+    static ChatStyle unresolvedBase(Markup.Token token) {
+        switch (token.kind) {
+            case "item":
+            case "fluid":
+            case "recipe":
+            case "uses":
+                return highlight(new String[] { Markup.NAME_COLORS.get("i") });
+            default:
+                return null;
+        }
     }
 
     /** The base style of a highlight span: a color name, then "b" / "u" flags; null for none. */
@@ -225,7 +238,11 @@ public final class MarkupRenderer {
          * ("[Quest: #id - name]" plus the text around it), which the client then wraps at spaces itself.
          */
         static Piece atom(ResolvedLink link) {
-            return new Piece(null, null, link, link.ownLine ? 0 : pixelWidth(link.vanilla));
+            return new Piece(
+                null,
+                null,
+                link,
+                link.ownLine ? 0 : Math.max(pixelWidth(link.vanilla), pixelWidth(link.mod)));
         }
 
         boolean isNewline() {

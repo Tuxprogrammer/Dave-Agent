@@ -128,6 +128,15 @@ public final class DaveChat {
         List<IChatComponent> vanillaOut = new ArrayList<>();
         for (int i = 0; i < rendered.vanillaLines.size(); i++) {
             boolean continued = rendered.continued.get(i);
+            if (rendered.vanillaLines.get(i)
+                .getUnformattedText()
+                .trim()
+                .isEmpty()) {
+                // Only mod-only links on this line (a [Show me in game] button): nothing to show without the mod.
+                IChatComponent mod = rendered.modLines.get(i);
+                modOut.add(fit(continued ? indented(mod) : prefixed(mod, whisper), warnings));
+                continue;
+            }
             fitBoth(
                 continued ? indented(rendered.modLines.get(i)) : prefixed(rendered.modLines.get(i), whisper),
                 continued ? indented(rendered.vanillaLines.get(i)) : prefixed(rendered.vanillaLines.get(i), whisper),

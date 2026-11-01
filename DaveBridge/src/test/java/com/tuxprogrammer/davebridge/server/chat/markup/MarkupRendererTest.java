@@ -353,4 +353,29 @@ class MarkupRendererTest {
                 .getColor());
         assertEquals("Cut it in a Cutting Machine (HV, 480 EU/t) at 5s", line.getUnformattedText());
     }
+
+    @Test
+    void showButtonIsInTheModLineOnly() {
+        MarkupRenderer.Rendered r = renderer(200, 40).render("It's in the back room.\n{show:the back room chest}");
+        assertEquals(2, r.modLines.size());
+        assertTrue(
+            r.modLines.get(1)
+                .getUnformattedText()
+                .contains("Show me in game"));
+        assertEquals(
+            "",
+            r.vanillaLines.get(1)
+                .getUnformattedText()
+                .trim());
+    }
+
+    @Test
+    void unresolvedItemKeepsTheItemGreen() {
+        IChatComponent line = renderer(200, 40).render("Use {item:nope:thing|Soldering Alloy} here").vanillaLines
+            .get(0);
+        assertEquals(
+            EnumChatFormatting.GREEN,
+            find(line, "Soldering Alloy").getChatStyle()
+                .getColor());
+    }
 }

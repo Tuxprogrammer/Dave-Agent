@@ -13,6 +13,7 @@ import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.ChatStyle;
@@ -59,6 +60,16 @@ public final class LessonClient {
 
     /** GregGuns' Golden Revolver: Dave's idle item when GregGuns is installed. Soft dependency, looked up by name. */
     static final String REVOLVER = "gregguns:golden_revolver";
+
+    /**
+     * GregGuns' Dictator Dave outfit, so the ghost looks like Dave in game: equipment slot (1 boots .. 4 helmet), item,
+     * camo. The same pieces as his GregGuns NPC profile: the red Beret, the Soldier's Vest and Boots, and the Bandit
+     * Pants in camo 2. The camo is the armor item's "camo" NBT integer. Soft dependency, looked up by name.
+     */
+    // Source: GregGuns entity/npc/loot/NpcProfiles.java ("DictatorDave") and entity/npc/NpcEquipment.java (MIT, our
+    // mod)
+    static final Object[][] OUTFIT = { { 4, "gregguns:t2_beret", 0 }, { 3, "gregguns:t1_combat_chestplate", 0 },
+        { 2, "gregguns:t1_scout_leggings", 2 }, { 1, "gregguns:t1_combat_boots", 0 } };
 
     private static final LessonRenderer RENDERER = new LessonRenderer();
     private static LessonPlayback playing;
@@ -116,6 +127,7 @@ public final class LessonClient {
         playing = next;
         world = new WeakReference<>(mc.theWorld);
         dave = new GhostDave(mc.theWorld); // never spawned: see GhostDave
+        dressDave(dave);
         lastSwings = 0;
         heldKey = null;
         RENDERER.reset();
@@ -223,6 +235,21 @@ public final class LessonClient {
             }
         }
         return heldStack;
+    }
+
+    /** Puts Dave's GregGuns outfit on the ghost; any piece that isn't registered is left off. */
+    private static void dressDave(GhostDave ghost) {
+        if (!Loader.isModLoaded("gregguns")) return;
+        for (Object[] piece : OUTFIT) {
+            Item item = (Item) GameData.getItemRegistry()
+                .getObject((String) piece[1]);
+            if (item == null) continue;
+            ItemStack stack = new ItemStack(item);
+            NBTTagCompound tag = new NBTTagCompound();
+            tag.setInteger("camo", (Integer) piece[2]);
+            stack.setTagCompound(tag);
+            ghost.setCurrentItemOrArmor((Integer) piece[0], stack);
+        }
     }
 
     private static ItemStack idleItem() {

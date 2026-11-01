@@ -136,6 +136,8 @@ public final class StandardLinkResolver implements LinkResolver {
                 return suggest(token, warnings);
             case "send":
                 return send(token, warnings);
+            case "show":
+                return show(token, warnings);
             case "waypoint":
                 return waypoint(token, warnings);
             case "guide":
@@ -307,6 +309,38 @@ public final class StandardLinkResolver implements LinkResolver {
                 token.style,
                 ChatStyles.hoverText("Click to say: " + text),
                 ChatStyles.run(text)));
+    }
+
+    /** Label of a {@code {show:}} button when the token has none. */
+    static final String SHOW_LABEL = "Show me in game";
+
+    /**
+     * {@code {show:what|label}}: a {@code [Show me in game]} button that says "dave, show me <what> in game", which
+     * asks Dave for a guided demonstration. Only players with the client half can watch one, so the vanilla variant
+     * is empty (the caller drops a line left blank by it).
+     */
+    ResolvedLink show(Markup.Token token, List<String> warnings) {
+        String prefix = options.sendPrefixes.length > 0 && options.sendPrefixes[0] != null
+            ? options.sendPrefixes[0].trim()
+            : "dave";
+        String head = prefix + (prefix.endsWith(",") ? " " : ", ") + "show me ";
+        String tail = " in game";
+        String what = stripUnsafe(token.arg.trim());
+        int room = MAX_CHAT_LENGTH - head.length() - tail.length();
+        if (what.length() > room) {
+            warnings.add(token.raw + ": show text cut to " + room + " characters");
+            what = what.substring(0, Math.max(0, room))
+                .trim();
+        }
+        String text = head + what + tail;
+        String label = token.label != null && !token.label.isEmpty() ? token.label : SHOW_LABEL;
+        IChatComponent mod = ChatStyles.button(
+            label,
+            EnumChatFormatting.LIGHT_PURPLE,
+            token.style,
+            ChatStyles.hoverText("Dave walks you there in game (only you see him)\nClick to say: " + text),
+            ChatStyles.run(text));
+        return new ResolvedLink(new ChatComponentText(""), mod, false, null);
     }
 
     /** Characters the server accepts in a chat packet (vanilla kicks for §, control characters and DEL). */

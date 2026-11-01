@@ -57,6 +57,9 @@ Example: `- Cut the wafer in a {m:Cutting Machine} (HV, 192 EU/t) with 135 L {i:
 - `{send:dave, show the full chain|Full chain}`: an `Ask: [Full chain]` button; the player says that text, so it
   comes back to you. It must start with `dave`, `@dave` or `!dave` and be at most 100 characters. Word the label
   as the follow-up question (`How do I get the wafer?`), not a fragment.
+- `{show:the nearest chest with titanium plates}`: a `[Show me in game]` button, only for players with the
+  DaveBridge client mod (others don't see it). The click says "dave, show me <that> in game", so it comes back to
+  you: then run a guided demonstration (the `lesson` tool). Say what to show, not how; keep it under 60 characters.
 - `{suggest:dave, why |Why?}`: puts the text into the player's chat line for them to finish.
 - `{cmd:/dave status|Status}`: runs that command. Only allowlisted commands work.
 
