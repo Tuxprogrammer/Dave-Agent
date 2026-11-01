@@ -258,7 +258,9 @@ player stops it. Nothing in the world changes. Design: `docs/plans/guided-demos.
 Highlights and ghost blocks stay up for the rest of the pass and are cleared when it restarts.
 
 Validation (on the server thread):
-- Every position must be within **32 blocks** of where the player stands, in **y 0..255**, in a **loaded chunk**.
+- Every position must be within **256 blocks** of where the player stands (**32** for clients before 0.2.4, which
+  drop farther points), in **y 0..255**, in a **loaded chunk**. The client stops the lesson when the player is 320
+  blocks from that spot.
   Highlight and ghost positions are floored to block positions.
 - Items and blocks must exist in the server's registries. `ore:` and numeric ids are not accepted.
 - At most **64 steps**; one pass at most **180 s** (3600 ticks).
@@ -281,7 +283,7 @@ Errors:
   validation (the message lists the warnings).
 
 A new lesson replaces the one playing (that one reports `lesson_status` `replaced`). The player stops a lesson with
-the `[Stop]` chat button, the stop key (unbound by default), `/davebridge stop`, by walking more than 48 blocks from
+the `[Stop]` chat button, the stop key (unbound by default), `/davebridge stop`, by walking more than 320 blocks from
 where the lesson was made, by changing dimension, or after 10 minutes of play; `/davebridge pause` (or `[Pause]`)
 toggles pause.
 

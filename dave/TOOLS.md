@@ -191,7 +191,7 @@ branch) only has to expose them:
   `{"highlight":{"pos":[x,y,z],"color"?:"gold"|"#rrggbb","label"?:str}}`,
   `{"ghost":{"pos":[x,y,z],"block":"modid:name","meta"?:int,"facing"?:"north"|...}}`, `{"swing":true}`,
   `{"say":str}`, `{"wait":ticks}`. Return the ack (`id`, `steps`, `dropped`, `passTicks`, `warnings`) so Dave can
-  read the warnings, or the error. Put the limits in the tool description: positions within 32 blocks of the player
+  read the warnings, or the error. Put the limits in the tool description: positions within 256 blocks of the player (32 for clients before 0.2.4)
   and in loaded chunks, at most 64 steps and 180 s per pass, items and blocks must exist.
 - `lesson_stop(player: str, id?: str)`: returns the ack.
 - On `no_client_mod` the player has no client half: Dave answers in chat (and may mention the client half).

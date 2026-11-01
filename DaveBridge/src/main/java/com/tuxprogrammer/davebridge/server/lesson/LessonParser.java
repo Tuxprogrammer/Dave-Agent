@@ -41,6 +41,11 @@ public final class LessonParser {
 
         /** A block with this registry name ("modid:name") exists and is not air. */
         boolean blockExists(String name);
+
+        /** How far from the player positions may be: the player's client decides (older ones play less). */
+        default double maxRadius() {
+            return LessonLimits.MAX_RADIUS;
+        }
     }
 
     /** The outcome: a lesson to send, or an {@link #error}. Warnings either way. */
@@ -389,7 +394,7 @@ public final class LessonParser {
             return false;
         }
         double d = distance(pos, anchor);
-        if (d > LessonLimits.MAX_RADIUS) {
+        if (d > env.maxRadius()) {
             warnings.add(
                 w + ": "
                     + fmt(pos[0])
@@ -400,7 +405,7 @@ public final class LessonParser {
                     + " is "
                     + fmt(d)
                     + " blocks from the player (max "
-                    + (int) LessonLimits.MAX_RADIUS
+                    + (int) env.maxRadius()
                     + "), dropped");
             return false;
         }

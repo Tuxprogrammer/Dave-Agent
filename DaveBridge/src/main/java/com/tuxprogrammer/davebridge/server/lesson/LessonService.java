@@ -15,6 +15,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.tuxprogrammer.davebridge.DaveBridge;
+import com.tuxprogrammer.davebridge.common.lesson.LessonLimits;
 import com.tuxprogrammer.davebridge.common.network.DaveNetwork;
 import com.tuxprogrammer.davebridge.common.protocol.DavePacket;
 import com.tuxprogrammer.davebridge.common.protocol.DavePackets;
@@ -182,7 +183,14 @@ public final class LessonService {
     /** World and registry lookups for the parser. Server thread only. */
     static LessonParser.Env env(EntityPlayerMP player) {
         WorldServer world = player.getServerForPlayer();
+        ClientModTracker.Info client = DaveServer.CLIENTS.get(player.getUniqueID());
+        double radius = LessonLimits.radiusFor(client == null ? null : client.modVersion);
         return new LessonParser.Env() {
+
+            @Override
+            public double maxRadius() {
+                return radius;
+            }
 
             @Override
             public boolean chunkLoaded(int x, int z) {

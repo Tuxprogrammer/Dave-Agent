@@ -93,8 +93,8 @@ Decisions made while building, checked against the source the pack ships:
 - **Walking** is straight-line interpolation between the agent's waypoints; no ground snapping yet. Dave should send
   waypoints from vanilla's pathfinder (via eval) for routes that aren't straight.
 - **Highlights and ghost blocks accumulate** through a pass and clear when it loops.
-- **Limits:** 64 steps, 180 s per pass, positions within 32 blocks of the player and in loaded chunks, auto-stop at
-  48 blocks or after 10 minutes, a 2 s pause between passes.
+- **Limits:** 64 steps, 180 s per pass, positions within 256 blocks of the player (32 for clients before 0.2.4) and in
+  loaded chunks, auto-stop at 320 blocks or after 10 minutes, a 2 s pause between passes.
 
 ## Testing
 
@@ -133,7 +133,7 @@ Send lessons from the agent socket (e.g. `DaveBridge/tools/dave_client.py`, or t
 10. **Controls.** `[Pause]` / `/davebridge pause` freezes and resumes (HUD says Paused); `[Stop]`,
     `/davebridge stop` and the "Stop Dave's demonstration" key (bind it in Controls; unbound by default) stop it and
     print a gray line; the agent gets `lesson_status` `stopped`/`player`.
-11. **Auto-stop.** Walking more than 48 blocks away, changing dimension, or relogging stops it (`walked_away` /
+11. **Auto-stop.** Walking more than 320 blocks away, changing dimension, or relogging stops it (`walked_away` /
     `dimension`); a non-looping lesson clears itself 5 s after the end (`finished`).
 12. **Replace.** Sending a second lesson replaces the first (`replaced` for the old id).
 13. **Shaders.** Repeat 2, 7, 8 and 9 with Angelica and the shader pack players use: no white wash, no black faces,

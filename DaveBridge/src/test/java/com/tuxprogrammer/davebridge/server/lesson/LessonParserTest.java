@@ -23,7 +23,7 @@ class LessonParserTest {
     private static final double[] ANCHOR = { 100.5, 64.0, -20.5 };
 
     /** Chunks with chunk x &lt; 10 are loaded; a few known items and blocks exist. */
-    private static final class FakeEnv implements LessonParser.Env {
+    private static class FakeEnv implements LessonParser.Env {
 
         final Set<String> items = new HashSet<>(
             Arrays.asList("minecraft:stick", "gregtech:gt.metatool.01", "gregguns:golden_revolver"));
@@ -113,9 +113,9 @@ class LessonParserTest {
     void positionsMustBeNearThePlayerAndLoadedAndInTheWorld() {
         LessonParser.Result r = parse(
             steps(
-                "{\"walkTo\":[140,64,-20]}", // 39.5 blocks away
+                "{\"walkTo\":[-200,64,-20]}", // 300.5 blocks away
                 "{\"lookAt\":[100,300,-20]}", // above the world
-                "{\"highlight\":[200,64,-20]}", // far
+                "{\"highlight\":[200,64,-20]}", // chunk 12: not loaded
                 "{\"highlight\":[161,64,-20]}", // chunk 10: not loaded (and far)
                 "{\"walkTo\":[120,64,-20]}"));
         assertEquals(1, r.lesson.steps.length);
@@ -128,6 +128,25 @@ class LessonParserTest {
             r.warnings.get(1)
                 .contains("outside the world"),
             r.warnings.get(1));
+    }
+
+    @Test
+    void farTargetsAreFineButOlderClientsKeepTheOldRadius() {
+        String spec = steps("{\"walkTo\":[140,64,-20]}", "{\"say\":\"here\"}"); // 39.5 blocks away
+        assertEquals(2, parse(spec).lesson.steps.length);
+        LessonParser.Env legacy = new FakeEnv() {
+
+            @Override
+            public double maxRadius() {
+                return LessonLimits.LEGACY_RADIUS;
+            }
+        };
+        LessonParser.Result r = LessonParser.parse(new JsonParser().parse(spec), ANCHOR, 0f, 0, legacy);
+        assertEquals(1, r.lesson.steps.length);
+        assertTrue(
+            r.warnings.get(0)
+                .contains("(max 32)"),
+            r.warnings.toString());
     }
 
     @Test

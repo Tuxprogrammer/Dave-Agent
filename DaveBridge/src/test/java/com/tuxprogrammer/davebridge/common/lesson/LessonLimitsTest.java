@@ -40,4 +40,15 @@ class LessonLimitsTest {
     void stopDistanceLeavesRoomToFollowDave() {
         assertTrue(LessonLimits.STOP_DISTANCE > LessonLimits.MAX_RADIUS + 8);
     }
+
+    @Test
+    void radiusDependsOnTheClientVersion() {
+        assertEquals(LessonLimits.MAX_RADIUS, LessonLimits.radiusFor("0.2.4"));
+        assertEquals(LessonLimits.MAX_RADIUS, LessonLimits.radiusFor("0.2.10"));
+        assertEquals(LessonLimits.MAX_RADIUS, LessonLimits.radiusFor("0.3.0-dev"));
+        assertEquals(LessonLimits.LEGACY_RADIUS, LessonLimits.radiusFor("0.2.3"));
+        assertEquals(LessonLimits.LEGACY_RADIUS, LessonLimits.radiusFor("0.1.9"));
+        assertEquals(LessonLimits.LEGACY_RADIUS, LessonLimits.radiusFor(null));
+        assertEquals(256.0, LessonLimits.MAX_RADIUS);
+    }
 }

@@ -154,8 +154,8 @@ TOOLS = [
             "of {\"walkTo\":[x,y,z]}, {\"lookAt\":[x,y,z]}, {\"hold\":\"modid:name[:meta]\"}, "
             "{\"highlight\":{\"pos\":[x,y,z],\"color\"?:\"gold\",\"label\"?:\"text\"}}, "
             "{\"ghost\":{\"pos\":[x,y,z],\"block\":\"modid:name\",\"meta\"?:0,\"facing\"?:\"north\"}}, "
-            "{\"swing\":true}, {\"say\":\"step text\"}, {\"wait\":ticks}. Limits: positions within 32 blocks "
-            "of the player and in loaded chunks, at most 64 steps and 180 s per pass; unknown items or blocks are "
+            "{\"swing\":true}, {\"say\":\"step text\"}, {\"wait\":ticks}. Limits: positions within 256 blocks "
+            "of the player (32 for clients before DaveBridge 0.2.4) and in loaded chunks, at most 64 steps and 180 s per pass; unknown items or blocks are "
             "dropped. Read the ack's warnings. The player defaults to the asker."
         ),
         "inputSchema": {
