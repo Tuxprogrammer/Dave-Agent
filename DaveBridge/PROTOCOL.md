@@ -79,9 +79,9 @@ A player addressed Dave (or `forwardAllChat` is on).
 
 Triggered chat is matched case-insensitively against `triggerPrefixes` at the start of the message. A prefix
 ending in a letter must be followed by a non-word character, so `@dave hi` matches and `@davey hi` does not.
-Messages cancelled by other mods (mutes, chat filters) are not forwarded. `source:"client"` asks are not shown
-to other players; the asker sees a gray `You -> Dave: ...` echo. Reply privately (`target` = the player) or
-publicly (`@a`) as you see fit.
+Messages cancelled by other mods (mutes, chat filters) are not forwarded. `source:"client"` asks are shown to
+every player as ordinary `<Player> text` chat, like typed chat (section 2.3). Reply publicly (`@a`) by default, or
+privately (`target` = the player) when asked.
 
 If no agent is connected, a triggered sender gets a private "Dave is not connected right now." notice
 (`notifyWhenOffline`).

@@ -77,7 +77,8 @@ def parse_string(buf, pos):
     return buf[pos:pos + n].decode("utf-8"), pos + n
 
 
-# Mods the bots claim to have. The dev server's runServer adds GTNHLib, which must be present on clients.
+# Mods the bots claim to have (extra entries are ignored by the server). GTNHLib is listed for dev setups that load
+# it; DaveBridge only compiles against it, so a plain runServer has none and fluids fall back to plain text.
 MODS = [("mcp", "9.05"), ("FML", "7.99.40.1614"), ("Forge", "10.13.4.1614"), ("gtnhlib", "0.11.48"),
         # BetterQuesting (loaded in DaveBridge's dev runs for the native quest links) must be on clients
         ("betterquesting", "3.8.92-GTNH"), ("questbook", "3.8.92-GTNH"), ("bq_standard", "3.8.92-GTNH"),
@@ -343,12 +344,14 @@ async def main(a):
     join = await next_event(lambda m: m.get("type") == "player_join" and m.get("player") == "ModBot", timeout=20)
     check("ModBot: player_join", join is not None, join)
     await asyncio.sleep(0.5)
+    # "nei": the client half has NEI, so recipe/uses links use its /davebridge nei command (PROTOCOL 2.3)
     await mod.send_dave("client_hello", {"modVersion": "0.1.0", "protocol": 1,
-                                         "capabilities": ["render", "ask", "context"], "clientEvalAllowed": False})
+                                         "capabilities": ["render", "ask", "context", "nei"],
+                                         "clientEvalAllowed": False})
     cm = await next_event(lambda m: m.get("type") == "client_mod")
     check("ModBot: client_mod event",
           cm.get("player") == "ModBot" and cm.get("hasClientMod") is True and cm.get("capabilities") == [
-              "render", "ask", "context"] and cm.get("clientEvalAllowed") is False, cm)
+              "render", "ask", "context", "nei"] and cm.get("clientEvalAllowed") is False, cm)
     sh, seen = await queue_get_matching(mod.packets, lambda p: p[0] == "server_hello")
     check("ModBot: server_hello packet", sh is not None and sh[1].get("botName") == "Dave", seen)
 
@@ -359,10 +362,16 @@ async def main(a):
           ask.get("source") == "client" and ask.get("triggered") is True
           and ask.get("prompt") == "what am I holding?" and ask.get("context") == ctx
           and ask.get("hasClientMod") is True, ask)
-    echo, seen = await queue_get_matching(mod.chat, lambda c: "You -> Dave" in flatten(c))
-    check("ModBot: private echo of the question", echo is not None, seen)
-    leak, _ = await queue_get_matching(plain.chat, lambda c: "what am I holding" in flatten(c), timeout=1.0)
-    check("ModBot: ask not shown to other players", leak is None, leak)
+    # Since 0.2.0 an Ask-key question is public, shown to everyone like vanilla chat (PROTOCOL 2.3: replies are
+    # public, so others must see the question to follow along)
+    def is_question(c):
+        m = json.loads(c)
+        return (m.get("translate") == "chat.type.text" and flatten(c).endswith("dave, what am I holding?")
+                and "ModBot" in flatten(json.dumps(m["with"][0])))
+    echo, seen = await queue_get_matching(mod.chat, is_question)
+    check("ModBot: the asker sees the question as <ModBot> chat", echo is not None, seen)
+    shown, seen = await queue_get_matching(plain.chat, is_question)
+    check("ModBot: the question is shown to other players too", shown is not None, seen)
 
     await asyncio.sleep(1.2)  # let the first ask's cooldown pass, then send two asks back to back
     await mod.send_dave("ask", {"text": "first of two"})
@@ -398,7 +407,7 @@ async def main(a):
     # ---- rich chat: markup rendered per recipient into native pack formats
     markup = ("Smelt {item:minecraft:iron_ingot} or {recipe:minecraft:iron_ingot|see the recipe}, "
               "{url:https://wiki.gtnewhorizons.com|Wiki}\n"
-              "Quest: {quest:Your First Automation}\n"
+              "Start with {quest:Your First Automation}\n"
               "{chain:minecraft:iron_ingot*4,minecraft:coal*2|Steel kit} {fluid:water} {item:nope:nope}\n"
               "{send:dave, show the full chain|Full chain} {suggest:dave, why |Why?}")
     for bot in (plain, mod):
@@ -455,8 +464,14 @@ async def main(a):
               kit_click.startswith("/nei_bookmark ") and kit_click.split(" ")[-1] in bot.nei_payloads
               and "Iron Ingot" in json.dumps(kit.get("hoverEvent")), kit)
         fluid = [c for c in components(l3) if c.get("gtnhlib_id") == "gtnhlib:ChatComponentFluidName"]
-        check(f"{name}: fluid uses GTNHLib's client-localized name with a details hover",
-              len(fluid) == 1 and "Fluid: water" in json.dumps(fluid[0].get("hoverEvent")), fluid)
+        if fluid:
+            check(f"{name}: fluid uses GTNHLib's client-localized name with a details hover",
+                  len(fluid) == 1 and "Fluid: water" in json.dumps(fluid[0].get("hoverEvent")), fluid)
+        else:
+            # no GTNHLib on this server (a plain runServer): the server-localized name, same hover
+            plain_fluid = find_styled(l3, "Water")
+            check(f"{name}: fluid (no GTNHLib here) is the server-localized name with a details hover",
+                  plain_fluid is not None and "Fluid: water" in json.dumps(plain_fluid.get("hoverEvent")), l3)
         check(f"{name}: unknown item degraded to plain text", find_component(l3, "nope:nope") is not None, flatten(l3))
         btn = find_styled(l4, "[Full chain]")
         check(f"{name}: send button runs the chat text",
