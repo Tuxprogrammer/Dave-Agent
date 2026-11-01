@@ -13,8 +13,8 @@ file = "mods/WorldEditCuiFe-v1.0.7-mf-1.7.10-10.13.4.1566.jar"
 hash = "fafc2dc319b50018e63712cfd087f1f32c112443e37dbdc1c09bf84bd2bc514a"
 
 [[files]]
-file = "mods/davebridge-0.2.0.jar"
-hash = "8d8d5fdd6b5264068652110d4fe55cd23f90c4156ceed7566e47e21317791cff"
+file = "mods/davebridge-0.2.1.jar"
+hash = "133027e7824f821e7ca352aff076ee0c47fd61553d5908dc07e4375d6894d3ab"
 
 [[files]]
 file = "mods/fortunateone.pw.toml"

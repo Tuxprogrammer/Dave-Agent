@@ -5,8 +5,8 @@ file = "config/fortunateone.cfg"
 hash = "e6676f0d6fdc36d39f7c5bca1847457882628f95ee960f7e2c0105d4d535b84f"
 
 [[files]]
-file = "mods/davebridge-0.2.0.jar"
-hash = "8d8d5fdd6b5264068652110d4fe55cd23f90c4156ceed7566e47e21317791cff"
+file = "mods/davebridge-0.2.1.jar"
+hash = "133027e7824f821e7ca352aff076ee0c47fd61553d5908dc07e4375d6894d3ab"
 
 [[files]]
 file = "mods/discordintegration.pw.toml"
