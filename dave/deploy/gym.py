@@ -32,22 +32,26 @@ CASES = [
     ("recipe-db", "exactly how are NAND chips made: machine, inputs, EU/t and time?", ["recipe_producers", "recipe_get", "item_find"], {}),
     ("recipe-uses", "what are NAND chips used in? just the top few", ["recipe_uses"], {}),
     ("live-gt-recipe", "check the live game's own recipe map: what does the laser engraver need to make a NAND wafer?", ["query_run", "eval"], {}),
-    ("eval-read", "use the live server: how many entities are loaded in the overworld right now?", ["eval"], {}),
+    ("eval-read", "use the live server: how many entities are loaded in the overworld right now?", ["eval", "query_run"], {}),
     ("describe", "what block is directly below me? check the live world", ["describe", "eval"], {}),
     ("world-lookup", "where is the nearest chest to me? give me a waypoint", ["query_run", "eval"], {"want": "{waypoint:"}),
     ("eval-write", "place one glass block at {sky}, nothing else", ["eval"], {"confirm": True}),
     ("eval-write-undo", "now remove that glass block at {sky} (set it back to air)", ["eval"], {"confirm": True}),
-    ("query-save", "save the script you used to count overworld entities as a saved query named gym-entity-count", ["query_save"], {}),
-    ("query-list", "which saved queries do you have? list their names", ["query_list", "query_run"], {}),
+    ("query-save", "write a small script that counts loaded tile entities in the overworld and save it as a new saved "
+     "query named {qname}", ["query_save"], {}),
+    ("query-list", "check your saved query library right now and list every name in it", ["query_list"],
+     {"want": "{qname}"}),
     ("planner", "I'm at HV: what's the best source of nitrogen? plan the chain", ["Agent", "Task", "plan_chain"], {}),
-    ("recipe-planner", "design me an HV factory for 1 stainless steel ingot per second: compare at least two routes "
-     "with machine counts and power, I have plenty of oxygen", ["Agent", "Task"], {}),
+    # A target Dave hasn't planned before (he rightly reuses an earlier plan for a repeated question).
+    ("recipe-planner", "design me an HV factory for {rate} aluminium ingots per minute: compare at least two "
+     "routes with machine counts and power", ["Agent", "Task"], {"followup": True}),
     ("memory-save", "remember that my main base is at 1200 70 -800 and I'm at HV", ["player_note", "memory_save"], {}),
     # The asker's profile is already in the turn envelope, so answering from it without a tool is right.
     ("memory-recall", "what do you remember about me?", [], {"want_any": ["1200"]}),
     ("memory-forget", "forget my base location please", ["player_note", "memory_forget", "memory_update", "memory_correct"], {}),
     ("wiki-read", "what does our server wiki say about the Vacuum Freezer? one line", ["wiki_get", "wiki_search_titles"], {}),
-    ("lesson-fallback", "show me in the world where an EBF controller goes (a guided demo)", ["lesson"], {}),
+    ("lesson-fallback", "try your guided demo tool: show me in the world where an EBF controller goes. If it fails, "
+     "tell me why", ["lesson"], {}),
     ("client-eval-gate", "check my client's render distance setting on my own computer", [], {"want_any": ["opt", "client", "online"]}),
     ("whisper", "whisper me the answer: what voltage is HV?", [], {"directive": "whisper"}),
     ("players", "who is online right now?", ["list_players", "eval"], {}),
@@ -107,10 +111,14 @@ def spawn(live, volume="/var/lib/docker/volumes/gtnh_gtnh_2_mc-data/_data", worl
     return tuple(out)
 
 
-def run_case(live, name, question, tools, opts, pos, sky):
-    q = question.format(sky="%d %d %d" % sky)
+def run_case(live, name, question, tools, opts, pos, sky, qname):
+    q = question.format(sky="%d %d %d" % sky, qname=qname, rate=int(time.time()) % 50 + 10)
+    opts = {k: (v.replace("{qname}", qname) if isinstance(v, str) else v) for k, v in opts.items()}
     before = live.turns()
     n = len(before)
+    # Tool calls already in the current session's transcript, so only this question's calls are counted.
+    session = before[-1].get("session") if before else None
+    base = len(live.tool_uses(session))
     live.rcon("dave", "ask", AS, "@%d,%d,%d,0" % pos, q)
     confirmed, deadline = [], time.time() + 900
     turn = None
@@ -121,21 +129,33 @@ def run_case(live, name, question, tools, opts, pos, sky):
                 if pid not in confirmed:
                     live.rcon("dave", "confirm", pid)
                     confirmed.append(pid)
-        new = [t for t in live.turns()[n:] if t.get("player") == AS]
+        # This question's own row; a late row (a background planner's follow-up) belongs to an earlier turn.
+        new = [t for t in live.turns()[n:] if t.get("player") == AS and not t.get("late")
+               and (t.get("prompt") or "").strip() == q.strip()]
         if new:
             turn = new[-1]
             break
     if not turn:
         return {"case": name, "ok": False, "why": "no answer within 15 minutes"}
     used = live.tool_uses(turn.get("session"))
-    # tools used in this turn: compare with the transcript length when the previous gym turn ended
-    prev = getattr(live, "_used_len", {}).get(turn.get("session"), 0)
-    this = used[prev:]
-    live._used_len = {turn.get("session"): len(used)}
+    this = used[base:] if turn.get("session") == session else used
+    followup = None
+    if any(u in ("Agent", "Task") for u in this):
+        # A delegated recipe-planner may run in the background and answer later as a "late" row of the same turn.
+        wait_until = min(deadline, time.time() + 600)
+        while time.time() < wait_until and not followup:
+            late = [t for t in live.turns()[n:] if t.get("turn") == turn.get("turn") and t.get("late")]
+            followup = late[-1] if late else None
+            if not followup:
+                time.sleep(5)
     reply = turn.get("reply") or ""
+    if followup:
+        reply += "\n[follow-up] " + (followup.get("reply") or "")
     problems = []
     if tools and not any(any(t in u for t in tools) for u in this):
         problems.append("expected one of %s, used %s" % (tools, sorted(set(this)) or "no tools"))
+    if opts.get("followup") and not followup and re.search(r"report|post|back", reply, re.I):
+        problems.append("the delegated planner never posted its follow-up")
     if opts.get("confirm") and not confirmed:
         problems.append("no confirm was requested")
     if opts.get("want") and opts["want"] not in reply:
@@ -159,12 +179,13 @@ def main():
     live = Live(a.host)
     pos = spawn(live)
     sky = (pos[0], min(pos[1] + 40, 250), pos[2])
+    qname = time.strftime("gym-tiles-%m%d%H%M")
     only = set(filter(None, a.only.split(",")))
     results = []
     for name, q, tools, opts in CASES:
         if only and name not in only:
             continue
-        r = run_case(live, name, q, tools, opts, pos, sky)
+        r = run_case(live, name, q, tools, opts, pos, sky, qname)
         results.append(r)
         print("%-18s %s  %5ss  $%-7s %s" % (name, "PASS" if r["ok"] else "FAIL", r.get("seconds"),
                                             r.get("cost"), r["why"] or ", ".join(r.get("tools") or [])), flush=True)
