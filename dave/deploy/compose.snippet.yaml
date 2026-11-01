@@ -1,0 +1,43 @@
+# Dave's service for the GTNH stack (/opt/gtnh/docker-compose.yaml on game-host). Merge these blocks into
+# the live file; it is root-owned and changes there need the owner's approval.
+#
+# Before the first start:
+#   - DaveBridge on gtnh_2: S:bindAddress=0.0.0.0 in /data/config/davebridge.cfg, then `/dave reload` (rcon-cli
+#     dave reload). Port 25580 stays out of gtnh_2's `ports:`, so only containers on this stack network reach it.
+#   - Secret files in /opt/gtnh/secrets/, owned by uid 10001 (the image's `dave` user), mode 0400:
+#       claude_oauth_token   CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token` (the owner's subscription)
+#       openrouter_api_key   the OpenRouter key (embeddings only)
+#       dave_token           the same value as authToken in gtnh_2's config/davebridge.cfg
+#   - The image: dave/deploy/build.sh --ship <host> (tags dave:current there).
+
+services:
+  dave:
+    image: dave:current
+    pull_policy: never                 # built from the Dave-Agent repo and shipped over the LAN, never pulled
+    restart: unless-stopped
+    init: true                         # reaps the claude, MCP and supercronic children
+    stop_grace_period: 30s
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      DAVE_BRIDGE_URL: "ws://gtnh_2:25580"
+    secrets: [claude_oauth_token, openrouter_api_key, dave_token]
+    volumes:
+      - dave-data:/dave/data           # memory, logs, search state and living wiki, memory exports
+      - dave-home:/dave/home           # Claude CLI state and sessions, so --resume survives a restart
+    tmpfs:
+      - /dave/run:uid=10001,gid=10001,mode=0700
+      - /tmp
+    # No ports: Dave only makes outbound connections (the bridge, Anthropic, OpenRouter, archive.org).
+
+secrets:
+  claude_oauth_token:
+    file: ./secrets/claude_oauth_token
+  openrouter_api_key:
+    file: ./secrets/openrouter_api_key
+  dave_token:
+    file: ./secrets/dave_token
+
+volumes:
+  dave-data:
+  dave-home:

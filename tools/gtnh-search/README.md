@@ -100,36 +100,12 @@ The image bakes the corpus and index in read-only as a **seed**. At run time the
 - **Reload.** The server checks the index file's mtime before each tool call (one `stat`) and reloads it when another process replaced it, so the weekly job needs no restart.
 - **Read-only mode.** Set by `GTNH_SEARCH_READONLY=1` or `server.py --readonly`, and used automatically when the index directory isn't writable. The server skips the background refresh and the lock file, `gtnh_reindex` returns an error, and `gtnh_search_status` says read-only.
 
-Wiring for the future Dockerfile (not written yet):
+**In the Dave container** ([`dave/deploy/`](../../dave/deploy/)) the wiring is:
 
-1. Build the seed in the build context (`index.py --extract`, `index.py`), then copy:
-   - `data/corpus` and `data/index` to `/app/data/`;
-   - `tools/gtnh-search/` and `tools/living-wiki/` to `/app/tools/`;
-   - `dave/` (the Sonnet merger imports its config and launch helpers).
-   
-   The baked `data/corpus/wiki` must be an official dump import (`mirror_wiki.py --from-dump`). A snapshot materialized from a dev living wiki is never treated as official.
-2. Set:
-   - `GTNH_SEARCH_DATA=/app/data/corpus` and `GTNH_SEARCH_INDEX_DIR=/app/data/index`;
-   - `GTNH_SEARCH_STATE=/var/lib/dave/search` (a volume; the living wiki lives at `<state>/wiki-git`);
-   - `OPENROUTER_API_KEY_FILE=/run/secrets/openrouter`;
-   - `CLAUDE_CODE_OAUTH_TOKEN`, or its docker secret, for the Sonnet merges.
-3. Entrypoint:
-   1. `python3 -I /app/tools/gtnh-search/index.py --seed` (it also creates the living wiki when the volume has none);
-   2. once, optionally, `python3 -I /app/tools/gtnh-search/update_wiki.py` (merges a newer dump baked into the image);
-   3. start [supercronic](https://github.com/aptible/supercronic) in the background with [`crontab`](crontab) (`supercronic /app/tools/gtnh-search/crontab &`);
-   4. start Dave.
-   
-   supercronic passes the container environment to the job and logs its output to stdout. Both MCP servers (`gtnh-search` and `living-wiki`) need the same `GTNH_SEARCH_STATE`.
-
-The MCP config is the same as above, with the `/app` path; the server inherits the environment:
-
-```json
-{
-  "mcpServers": {
-    "gtnh-search": {"command": "python3", "args": ["-I", "/app/tools/gtnh-search/server.py"]}
-  }
-}
-```
+- **Seed:** `data/corpus` and `data/index` are baked read-only at `/dave/ro/corpus` and `/dave/ro/index` (`GTNH_SEARCH_DATA`, `GTNH_SEARCH_INDEX_DIR`). The baked `data/corpus/wiki` must hold official content: a dump import, or a living-wiki snapshot with no Dave edits.
+- **State:** `GTNH_SEARCH_STATE=/dave/data/state` on the `dave-data` volume; the living wiki is `<state>/wiki-git`.
+- **Secrets:** `OPENROUTER_API_KEY_FILE=/run/secrets/openrouter_api_key`; the Sonnet merges read `CLAUDE_CODE_OAUTH_TOKEN` from `/run/secrets/claude_oauth_token` through `dave/config.py`.
+- **Start:** `entrypoint.sh` runs `index.py --seed` (which also creates the living wiki when the volume has none), starts supercronic with [`dave/deploy/crontab`](../../dave/deploy/crontab) (the weekly `update_wiki.py`), then the daemon. Dave's process starts both MCP servers with the same environment, through `dave/launch/mcp.json`.
 
 ## Tools exposed to Dave
 

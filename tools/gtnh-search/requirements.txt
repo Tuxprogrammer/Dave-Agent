@@ -1,0 +1,2 @@
+# Installed into the Dave image by dave/deploy/Dockerfile. Everything else in gtnh-search is standard library.
+numpy==2.5.4

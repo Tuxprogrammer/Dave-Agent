@@ -1,0 +1,28 @@
+# Docker context for dave/deploy/Dockerfile (context = repo root). Allow-list: code and baked read-only data only.
+*
+!dave/
+!tools/
+!data/corpus/
+!data/index/
+!data/memory/
+!gtnh-src/
+!DaveBridge/PROTOCOL.md
+!DaveBridge/docs/dave-markup.md
+
+# Never in the image: secrets, dev runtime state, caches.
+dave/.env
+dave/.run/
+dave/.claude-home/
+**/__pycache__/
+**/*.pyc
+data/index/*.lock
+data/memory/.lock
+data/memory/**/.tmp-*
+data/corpus/.wiki.*
+
+# Superseded decompiles (Dave is denied them anyway) and the upstream checkouts' git metadata and agent files.
+gtnh-src/_decompiled/
+gtnh-src/source/*/.git/
+gtnh-src/**/.claude/
+gtnh-src/**/CLAUDE.md
+gtnh-src/**/AGENTS.md

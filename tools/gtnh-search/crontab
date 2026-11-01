@@ -1,7 +1,0 @@
-# supercronic crontab for the Dave container (https://github.com/aptible/supercronic). Fields: minute hour day
-# month weekday command; times are in the container's TZ (UTC unless TZ is set). supercronic logs each job's
-# stdout and stderr, and the job prints one summary line.
-#
-# Weekly wiki refresh: Monday 05:17. It only downloads when archive.org has a newer Miraheze dump, then imports it
-# onto the living wiki's `official` branch and merges it into `living` (conflicted pages: Sonnet via claude -p).
-17 5 * * 1 python3 -I /app/tools/gtnh-search/update_wiki.py

@@ -1,0 +1,11 @@
+# supercronic crontab for the Dave container (https://github.com/aptible/supercronic), started by entrypoint.sh.
+# Fields: minute hour day month weekday command, in the container's TZ (UTC). supercronic logs each job's output
+# to the container log.
+
+# Weekly wiki refresh, Monday 05:17. It only downloads when archive.org has a newer Miraheze dump, then imports
+# it onto the living wiki's `official` branch and merges it into `living` (conflicted pages: Sonnet via claude -p).
+17 5 * * 1 python3 -I /dave/app/tools/gtnh-search/update_wiki.py
+
+# Nightly memory export into the volume, keeping 14. Pull one into the repo with
+#   docker cp gtnh-dave-1:/dave/data/exports/<file> . && tar -xzf <file> -C data/   (then review `git diff`)
+43 4 * * * python3 -I /dave/app/dave/memory/store.py export /dave/data/exports 14

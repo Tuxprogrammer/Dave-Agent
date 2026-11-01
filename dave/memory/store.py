@@ -17,7 +17,7 @@ small frontmatter block of "key: value" lines; lists, dicts and anything ambiguo
 
 Nothing is deleted: forget() archives, correct() supersedes, and every version stays in .objects/.
 
-CLI (for the owner):  python3 -I dave/memory/store.py index | log [N] | restore <id> <sha>
+CLI (for the owner):  python3 -I dave/memory/store.py index | log [N] | restore <id> <sha> | export <dir> [keep]
 """
 
 import fcntl
@@ -27,6 +27,7 @@ import math
 import os
 import re
 import sys
+import tarfile
 import tempfile
 import time
 from contextlib import contextmanager
@@ -696,8 +697,35 @@ def load_turn_context(player_uuid, query=None, player_name=None, limit=1500, sto
     return out or parts[0][:limit]
 
 
+def export(store, out_dir, keep=14, now=None):
+    """Writes dave-memory-<UTC date>-<last log hash>.tar.gz of the whole folder into out_dir, under the store lock so
+    it is consistent, and keeps the newest `keep` exports. Returns the archive path.
+
+    The owner unpacks one over data/memory/ in the repo and reviews `git diff`; see docs/plans/dave-core.md.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(now))
+    with store._locked():
+        log = store.root / ".log.jsonl"
+        last = log.read_text().splitlines()[-1] if log.exists() and log.stat().st_size else ""
+        name = "dave-memory-%s-%s.tar.gz" % (stamp, sha(last)[:10] if last else "empty")
+        part = out_dir / (TMP_PREFIX + name + ".part")
+        with tarfile.open(part, "w:gz") as tar:
+            tar.add(store.root, arcname="memory",
+                    filter=lambda ti: None if Path(ti.name).name in (".lock",) or TMP_PREFIX in ti.name else ti)
+        os.replace(part, out_dir / name)
+    exports = sorted(out_dir.glob("dave-memory-*.tar.gz"))
+    for old in exports[:-keep] if keep > 0 else []:
+        old.unlink()
+    return out_dir / name
+
+
 def main(argv):
     store = open_store(actor="owner")
+    if argv[:1] == ["export"] and len(argv) in (2, 3):
+        print("wrote", export(store, argv[1], int(argv[2]) if len(argv) == 3 else 14))
+        return 0
     if argv[:1] == ["index"]:
         store.write_index()
         print("wrote", store.root / "INDEX.md")

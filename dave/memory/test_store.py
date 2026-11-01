@@ -36,6 +36,20 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(meta2, meta)
         self.assertEqual(body, "Body text\n\n## H\n- x\n")
 
+    def test_export_archives_folder_and_keeps_newest(self):
+        import tarfile
+        self.s.save("server", "Spawn rules", "No building within 50 blocks of spawn.")
+        exports = tempfile.TemporaryDirectory()
+        self.addCleanup(exports.cleanup)
+        out = Path(exports.name)
+        paths = [st.export(self.s, out, keep=2, now=1_800_000_000 + i) for i in range(3)]
+        self.assertEqual(sorted(out.glob("dave-memory-*.tar.gz")), paths[1:])
+        with tarfile.open(paths[-1]) as tar:
+            names = tar.getnames()
+        self.assertIn("memory/server/spawn-rules.md", names)
+        self.assertIn("memory/.log.jsonl", names)
+        self.assertNotIn("memory/.lock", names)
+
     def test_save_recall_get(self):
         mid = self.s.save("playbook", "Best nitrogen source at HV", "Question: N2 at HV\nAnswer: centrifuge air",
                           tags=["nitrogen", "HV"], player="Alex")
