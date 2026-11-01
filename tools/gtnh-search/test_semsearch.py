@@ -337,6 +337,15 @@ class WikiTest(unittest.TestCase):
             self.assertNotIn(gone, text)
         self.assertEqual(cats, ["Machines"])
 
+    def test_infobox_field_with_piped_link(self):
+        wt = ("{{Infobox Multiblock\n|name=Purification Unit\n|tier=[[Extremely Ultimate Voltage (UEV)|UEV]]\n"
+              "|machine=[[Electric Blast Furnace]]\n|size=17 x 17 x 17\n}}")
+        text, _ = mirror_wiki.wikitext_to_text(wt)
+        self.assertIn("tier: UEV\n", text)
+        self.assertIn("machine: Electric Blast Furnace", text)
+        self.assertIn("size: 17 x 17 x 17", text)
+        self.assertNotIn("[[", text)
+
     def test_dump_import(self):
         xml = ('<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/"><page><title>EBF</title><ns>0</ns><id>5</id>'
                '<revision><id>42</id><timestamp>2026-01-01T00:00:00Z</timestamp><text>== Heat ==\nCoils.</text></revision></page>'

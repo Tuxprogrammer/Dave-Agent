@@ -58,9 +58,27 @@ def strip_nested(text, open_, close, repl):
     return text
 
 
+def split_params(inner):
+    """Splits template parameters on the pipes that aren't inside a [[link|label]], so a linked field stays whole.
+    Nested templates are already gone (strip_nested replaces innermost first)."""
+    parts, depth, start, i = [], 0, 0, 0
+    while i < len(inner):
+        two = inner[i:i + 2]
+        if two == "[[":
+            depth, i = depth + 1, i + 2
+        elif two == "]]" and depth:
+            depth, i = depth - 1, i + 2
+        else:
+            if inner[i] == "|" and not depth:
+                parts.append(inner[start:i])
+                start = i + 1
+            i += 1
+    return parts + [inner[start:]]
+
+
 def template(inner):
     """Block templates (infoboxes) keep their named fields as 'key: value' lines; inline templates are dropped."""
-    parts = [p.strip() for p in inner.split("|")]
+    parts = [p.strip() for p in split_params(inner)]
     if "\n" not in inner or len(parts) < 2:
         return ""
     fields = []

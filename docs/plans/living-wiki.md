@@ -229,5 +229,5 @@ It re-runs that page's merge from the stored report, prints the validated result
 ## Known limits
 
 - Dave edits the converted text, not the wikitext; `raw/` stays official.
-- The wikitext converter flattens templates. For example, an infobox link can come out as `tier: [[Extreme Voltage (EV)`. Fixing the converter shows up as an official change on the next import.
+- Fixed 2026-11-01: the wikitext converter split infobox fields on the pipe inside `[[Target|label]]` links (219 pages, e.g. `tier: [[Extreme Voltage (EV)`). The fix reached the living wiki by re-importing the current dump with `update_wiki.py --force miraheze-wiki-gtnhwiki-20260904`, which makes it an official change like any other.
 - The merger works page by page. A fact that moved to another page upstream shows up as two separate page changes.
