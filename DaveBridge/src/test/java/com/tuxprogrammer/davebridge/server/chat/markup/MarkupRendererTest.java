@@ -84,10 +84,14 @@ class MarkupRendererTest {
         return out;
     }
 
+    /** The innermost component holding {@code text} (typed links nest the link under a "Type: " wrapper). */
     static IChatComponent find(IChatComponent line, String text) {
         for (IChatComponent c : flat(line)) {
             if (c.getUnformattedText()
-                .contains(text)) return c;
+                .contains(text)) {
+                IChatComponent inner = find(c, text);
+                return inner != null ? inner : c;
+            }
         }
         return null;
     }
@@ -146,7 +150,7 @@ class MarkupRendererTest {
         assertTrue(
             text.vanillaLines.get(0)
                 .getUnformattedText()
-                .startsWith("Do betterquesting.msg.sharequest:"));
+                .startsWith("Do Quest: betterquesting.msg.sharequest:"));
 
         MarkupRenderer.Rendered links = renderer(200, 40)
             .render("{item:gregtech:steel} and {quest:Steel} and {item:gregtech:steel}");
@@ -154,35 +158,36 @@ class MarkupRendererTest {
         assertTrue(
             links.vanillaLines.get(1)
                 .getUnformattedText()
-                .startsWith("betterquesting.msg.sharequest:"));
+                .startsWith("Quest: betterquesting.msg.sharequest:"));
     }
 
     @Test
-    void wrapsTextButNeverSplitsATokenAndDropsBlankLines() {
+    void widthBreaksStayOneMessageAndBlankLinesDrop() {
+        // A paragraph wider than the line width is still one chat message (the client wraps it), so the bot's name
+        // never lands mid-sentence; Dave's own newlines still start new messages.
         String markup = "aaaa bbbb cccc dddd eeee ffff {item:gregtech:steel|Steel Ingot Label} gggg\n\n\nend";
         MarkupRenderer.Rendered r = renderer(20, 40).render(markup);
-        for (IChatComponent line : r.vanillaLines) {
-            String t = line.getUnformattedText();
-            assertTrue(t.length() <= 20 || t.equals("Steel Ingot Label"), "too long: " + t);
-            assertTrue(
-                !t.trim()
-                    .isEmpty());
-        }
-        boolean whole = false;
-        for (IChatComponent line : r.vanillaLines) {
-            if (find(line, "Steel Ingot Label") != null) whole = true;
-        }
-        assertTrue(whole, "token text must be intact");
+        assertEquals(2, r.vanillaLines.size());
+        assertEquals(
+            "aaaa bbbb cccc dddd eeee ffff Steel Ingot Label gggg",
+            r.vanillaLines.get(0)
+                .getUnformattedText());
+        assertNotNull(find(r.vanillaLines.get(0), "Steel Ingot Label"), "token text must be intact");
         assertEquals(
             "end",
-            r.vanillaLines.get(r.vanillaLines.size() - 1)
+            r.vanillaLines.get(1)
                 .getUnformattedText());
     }
 
     @Test
-    void hardCutsVeryLongWords() {
-        MarkupRenderer.Rendered r = renderer(20, 40).render("x" + new String(new char[45]).replace("\0", "y"));
-        assertEquals(3, r.vanillaLines.size());
+    void veryLongWordsStayWhole() {
+        String word = "x" + new String(new char[45]).replace("\0", "y");
+        MarkupRenderer.Rendered r = renderer(20, 40).render(word);
+        assertEquals(1, r.vanillaLines.size());
+        assertEquals(
+            word,
+            r.vanillaLines.get(0)
+                .getUnformattedText());
     }
 
     @Test
@@ -291,7 +296,7 @@ class MarkupRendererTest {
         MarkupRenderer.Rendered r = renderer(200, 40)
             .render("{send:dave, show the full chain|Full chain} {suggest:dave, why |Why?} {cmd:/dave status|Status}");
         IChatComponent line = r.vanillaLines.get(0);
-        assertEquals("[Full chain] [Why?] [Status]", line.getUnformattedText());
+        assertEquals("Ask: [Full chain] [Why?] [Status]", line.getUnformattedText());
         IChatComponent send = find(line, "Full chain");
         assertEquals(
             ClickEvent.Action.RUN_COMMAND,

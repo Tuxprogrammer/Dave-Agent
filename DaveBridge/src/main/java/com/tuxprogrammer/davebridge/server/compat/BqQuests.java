@@ -84,15 +84,13 @@ public final class BqQuests {
             String name = source.nameOf(id);
             if (name != null) return new Quest(id, name, 1);
         }
-        String wanted = trimmed.toLowerCase(Locale.ROOT);
+        String wanted = plain(trimmed);
         UUID firstId = null;
         String firstName = null;
         int matches = 0;
         for (UUID questId : source.ids()) {
             String n = source.nameOf(questId);
-            if (n != null && n.trim()
-                .toLowerCase(Locale.ROOT)
-                .equals(wanted)) {
+            if (n != null && plain(n).equals(wanted)) {
                 matches++;
                 if (firstId == null) {
                     firstId = questId;
@@ -101,6 +99,16 @@ public final class BqQuests {
             }
         }
         return firstId == null ? null : new Quest(firstId, firstName, matches);
+    }
+
+    /**
+     * A quest name for matching: without formatting codes (GTNH titles are mostly coloured, e.g.
+     * {@code §5§lNOR and NAND Chips}), trimmed, lower case.
+     */
+    static String plain(String name) {
+        return name.replaceAll("§.", "")
+            .trim()
+            .toLowerCase(Locale.ROOT);
     }
 
     /** UUID string, or BQ's compact base64 id with or without padding; null otherwise. */

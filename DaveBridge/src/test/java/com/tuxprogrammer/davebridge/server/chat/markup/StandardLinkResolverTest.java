@@ -40,9 +40,35 @@ class StandardLinkResolverTest {
         return resolve(o, markup);
     }
 
+    /** The first click in the link's component tree (typed links put the clickable part after a grey type word). */
     private static ClickEvent click(ResolvedLink l) {
-        return l.vanilla.getChatStyle()
-            .getChatClickEvent();
+        return click(l.vanilla);
+    }
+
+    private static ClickEvent click(IChatComponent c) {
+        if (c.getChatStyle()
+            .getChatClickEvent() != null) {
+            return c.getChatStyle()
+                .getChatClickEvent();
+        }
+        for (Object sibling : c.getSiblings()) {
+            ClickEvent e = click((IChatComponent) sibling);
+            if (e != null) return e;
+        }
+        return null;
+    }
+
+    @Test
+    void typedLinksSayWhatTheyAre() {
+        assertEquals("Ask: [More]", resolve("{send:dave, more|More}").vanilla.getUnformattedText());
+        assertEquals("Guide: [GT guide]", resolve("{guide:gregtech:main|GT guide}").vanilla.getUnformattedText());
+        assertTrue(
+            resolve("{waypoint:100,64,-200,-1|Base}").vanilla.getUnformattedText()
+                .startsWith("Waypoint: [Base"));
+        // no type word where the label reads fine inline
+        assertEquals(
+            "wiki",
+            resolve("{url:https://wiki.gtnewhorizons.com/wiki/Steel|wiki}").vanilla.getUnformattedText());
     }
 
     @Test

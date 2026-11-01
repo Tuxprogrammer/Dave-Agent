@@ -41,6 +41,16 @@ class BqQuestsTest {
     }
 
     @Test
+    void colouredQuestNamesMatchWithoutTheirFormattingCodes() {
+        Map<UUID, String> quests = new LinkedHashMap<>();
+        UUID chips = new UUID(0, 1239);
+        quests.put(chips, "\u00a75\u00a7lNOR and NAND Chips");
+        BqQuests.Quest q = BqQuests.find("NOR and NAND Chips", source(quests));
+        assertNotNull(q);
+        assertEquals(chips, q.id);
+    }
+
+    @Test
     void aNameThatLooksLikeACompactIdIsStillFoundByName() {
         String name = "ThaumcraftIntroduction"; // 22 base64-safe characters
         assertEquals(22, name.length());

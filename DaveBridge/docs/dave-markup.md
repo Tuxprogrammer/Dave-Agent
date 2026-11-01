@@ -6,7 +6,7 @@ about 10 lines at once.
 
 ## Text
 
-- One chat line per line of markup. Blank lines are dropped.
+- One chat message per line of markup; a long line wraps on the player's screen. Blank lines are dropped.
 - `**bold**` `*italic*` `__underline__` `~~strike~~` `` `code` `` (code shows gray).
 - Colors: `{gold}text{/gold}`, `{red}...{/}` (`{/}` closes the last one, `{/color}` the last color). Colors: black, dark_blue,
   dark_green, dark_aqua, dark_red, dark_purple, gold, gray, dark_gray, blue, green, aqua, red, light_purple,
@@ -19,24 +19,28 @@ about 10 lines at once.
 - `{item:minecraft:iron_ingot}`: the item's name; hover shows its real tooltip; click adds it to the
   player's NEI bookmarks. Item ids are `modid:name` or `modid:name:meta`; `ore:ingotSteel` picks the first item
   with that ore name. `{item:gregtech:gt.metaitem.01:11305|steel}` shows your label instead of the name.
-- `{recipe:minecraft:iron_ingot}` / `{uses:minecraft:iron_ingot}`: like item; for players with the DaveBridge
-  client mod the click opens the NEI recipe / usage page.
+- `{recipe:minecraft:iron_ingot}` / `{uses:minecraft:iron_ingot}`: shows as `Recipe: [Iron Ingot]` /
+  `Uses: [Iron Ingot]`; for players with the DaveBridge client mod the click opens the NEI recipe / usage page.
+  The type word is added for you, so a label is just the item's name (`|NAND Chip`, not `|NAND chip recipe`).
 - `{fluid:water}`: the fluid's name with a hover (id, temperature).
 - `{chain:minecraft:iron_ingot*4, minecraft:coal*2|Steel kit}`: a `[Steel kit]` button that adds the items with
   amounts to the player's NEI bookmarks as one group.
-- `{quest:Your First Automation}` or `{quest:<quest id>}`: a Quest Book link that opens the quest. One quest
-  per line; other links on that line move to the next line.
+- `{quest:Your First Automation}` or `{quest:<quest id>}`: shows as `Quest: ` and a Quest Book link that opens
+  the quest. Use the quest's exact title (from search). One quest per line; other links on that line move to the
+  next line.
 - `{url:https://wiki.gtnewhorizons.com/wiki/Steel|wiki}`: a clickable link (http and https only).
 - `{player:Steve}`: the player's name; click starts a /msg. Must be online.
-- `{waypoint:100,64,-200|Base}`: a button that opens JourneyMap's waypoint editor at those coordinates.
+- `{waypoint:100,64,-200|Base}`: a `Waypoint: [Base]` button that opens JourneyMap's waypoint editor at those
+  coordinates.
   Add `,-1` for the Nether.
 - `{hover:Shown on hover|word}`: `word` with a hover. `\n` makes a new line in the hover (elsewhere `\n` is just a
   space). The hover text may use styles and colors: `{hover:{red}**Hot**{/}\nmelts tin|lava}`.
 
 ## Buttons (put follow-ups at the end of a reply)
 
-- `{send:dave, show the full chain|Full chain}`: the player says that text, so it comes back to you. It must
-  start with `dave,`, `@dave` or `!dave` and be at most 100 characters.
+- `{send:dave, show the full chain|Full chain}`: an `Ask: [Full chain]` button; the player says that text, so it
+  comes back to you. It must start with `dave,`, `@dave` or `!dave` and be at most 100 characters. Word the label
+  as the follow-up question (`How do I get the wafer?`), not a fragment.
 - `{suggest:dave, why |Why?}`: puts the text into the player's chat line for them to finish.
 - `{cmd:/dave status|Status}`: runs that command. Only allowlisted commands work.
 
@@ -44,8 +48,8 @@ Example:
 
 ```
 # Steel
-Mix {item:ore:dustSteel|steel dust} and smelt it into {recipe:gregtech:gt.metaitem.01:11305|steel ingots}.
-Then follow the quest: {quest:Steel}
+Mix {item:ore:dustSteel|steel dust} and smelt it: {recipe:gregtech:gt.metaitem.01:11305|Steel Ingot}
+{quest:Steel}
 {send:dave, show the full chain|Full chain} {send:dave, why steel?|Why?} {suggest:dave, |Ask more}
 ```
 

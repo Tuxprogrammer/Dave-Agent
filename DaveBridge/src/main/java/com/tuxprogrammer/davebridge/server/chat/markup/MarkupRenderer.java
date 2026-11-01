@@ -102,14 +102,19 @@ public final class MarkupRenderer {
             }
         }
 
-        List<List<Piece>> lines = layout(pieces);
+        List<Integer> soft = new ArrayList<>();
+        List<List<Piece>> lines = layout(pieces, soft);
         if (lines.size() > maxLines) {
             warnings.add("message cut to " + maxLines + " lines");
             lines = new ArrayList<>(lines.subList(0, maxLines - 1));
+            soft = new ArrayList<>(soft.subList(0, maxLines - 1));
+            soft.set(soft.size() - 1, HARD);
             List<Piece> cut = new ArrayList<>();
             cut.add(Piece.text(TRUNCATED, new ChatStyle().setColor(net.minecraft.util.EnumChatFormatting.GRAY)));
             lines.add(cut);
+            soft.add(HARD);
         }
+        lines = joinSoftBreaks(lines, soft);
         List<IChatComponent> mod = new ArrayList<>();
         List<IChatComponent> vanilla = new ArrayList<>();
         for (List<Piece> line : lines) {
@@ -195,14 +200,56 @@ public final class MarkupRenderer {
         }
     }
 
-    private List<List<Piece>> layout(List<Piece> pieces) {
+    /**
+     * Rejoins lines that were split only because they were wider than {@link #width}, so one paragraph is one chat
+     * message and the client wraps it to the player's chat width. Splitting it would start every piece with the bot's
+     * name, often mid-sentence. Dave's own line breaks stay, and so do the splits that keep an exclusive (quest) link
+     * apart from other links.
+     */
+    static List<List<Piece>> joinSoftBreaks(List<List<Piece>> lines, List<Integer> soft) {
+        List<List<Piece>> out = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            List<Piece> line = lines.get(i);
+            if (i > 0 && soft.get(i - 1) != HARD && canShare(out.get(out.size() - 1), line)) {
+                List<Piece> prev = out.get(out.size() - 1);
+                if (soft.get(i - 1) == SOFT_SPACE) {
+                    prev.add(Piece.text(" ", new ChatStyle()));
+                }
+                prev.addAll(line);
+            } else {
+                out.add(new ArrayList<>(line));
+            }
+        }
+        return out;
+    }
+
+    /** Whether two lines may become one message: never an exclusive link together with another link. */
+    private static boolean canShare(List<Piece> a, List<Piece> b) {
+        int links = 0;
+        boolean exclusive = false;
+        for (List<Piece> line : java.util.Arrays.asList(a, b)) {
+            for (Piece p : line) {
+                if (p.link != null) {
+                    links++;
+                    exclusive |= p.link.ownLine;
+                }
+            }
+        }
+        return !exclusive || links <= 1;
+    }
+
+    /** How a laid-out line ended: a real break, or width alone (rejoined with or without the space it replaced). */
+    static final int HARD = 0, SOFT_SPACE = 1, SOFT_JOIN = 2;
+
+    /** Lays pieces into lines of at most {@link #width}; {@code soft} gets, per line, how it ended. */
+    private List<List<Piece>> layout(List<Piece> pieces, List<Integer> soft) {
         List<List<Piece>> lines = new ArrayList<>();
         List<Piece> cur = new ArrayList<>();
         int[] curLen = { 0 };
 
         for (Piece p : pieces) {
             if (p.isNewline()) {
-                endLine(lines, cur, curLen);
+                endLine(lines, soft, HARD, cur, curLen);
                 cur = new ArrayList<>();
                 continue;
             }
@@ -218,7 +265,7 @@ public final class MarkupRenderer {
                 }
                 boolean clash = p.link.ownLine ? lineHasLink : lineExclusive;
                 if (clash || (curLen[0] > 0 && curLen[0] + p.length > width)) {
-                    endLine(lines, cur, curLen);
+                    endLine(lines, soft, clash ? HARD : SOFT_SPACE, cur, curLen);
                     cur = new ArrayList<>();
                 }
                 cur.add(p);
@@ -234,6 +281,7 @@ public final class MarkupRenderer {
                     break;
                 }
                 int cut = available > 0 ? rest.lastIndexOf(' ', available) : -1;
+                int end = SOFT_SPACE;
                 if (cut > 0) {
                     cur.add(Piece.text(rest.substring(0, cut), p.style));
                     rest = rest.substring(cut + 1);
@@ -242,18 +290,20 @@ public final class MarkupRenderer {
                 } else {
                     cur.add(Piece.text(rest.substring(0, available), p.style));
                     rest = rest.substring(available);
+                    end = SOFT_JOIN; // cut inside a word
                 }
                 curLen[0] += 1; // force the line to end
-                endLine(lines, cur, curLen);
+                endLine(lines, soft, end, cur, curLen);
                 cur = new ArrayList<>();
                 rest = stripLeading(rest);
             }
         }
-        endLine(lines, cur, curLen);
+        endLine(lines, soft, HARD, cur, curLen);
         return lines;
     }
 
-    private static void endLine(List<List<Piece>> lines, List<Piece> cur, int[] curLen) {
+    private static void endLine(List<List<Piece>> lines, List<Integer> soft, int softEnd, List<Piece> cur,
+        int[] curLen) {
         // drop lines that are empty or only whitespace
         boolean blank = true;
         for (Piece p : cur) {
@@ -271,6 +321,7 @@ public final class MarkupRenderer {
                 cur.set(cur.size() - 1, Piece.text(t, last.style));
             }
             lines.add(new ArrayList<>(cur));
+            soft.add(softEnd);
         }
         cur.clear();
         curLen[0] = 0;

@@ -3,8 +3,10 @@ package com.tuxprogrammer.davebridge.server.chat.markup;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
@@ -64,8 +66,67 @@ public final class StandardLinkResolver implements LinkResolver {
         this.game = game;
     }
 
+    /**
+     * Grey type words shown before links whose label alone doesn't say what clicking does, e.g.
+     * {@code Recipe: [NAND Chip]} or {@code Ask: [More detail]}. Items, fluids, players and plain URLs read fine inline
+     * and get none.
+     */
+    static final Map<String, String> TYPE_LABELS = new HashMap<>();
+
+    static {
+        TYPE_LABELS.put("recipe", "Recipe");
+        TYPE_LABELS.put("uses", "Uses");
+        TYPE_LABELS.put("quest", "Quest");
+        TYPE_LABELS.put("send", "Ask");
+        TYPE_LABELS.put("waypoint", "Waypoint");
+        TYPE_LABELS.put("guide", "Guide");
+    }
+
     @Override
     public ResolvedLink resolve(Markup.Token token, List<String> warnings) {
+        ResolvedLink link = resolveKind(token, warnings);
+        String type = TYPE_LABELS.get(token.kind);
+        if (link == null || type == null) {
+            return link;
+        }
+        // Item links (recipe, uses) are bare names when labelled; buttons are bracketed already, and a quest is
+        // BetterQuesting's share token, which must stay exactly as BQ wrote it.
+        boolean bracket = "recipe".equals(token.kind) || "uses".equals(token.kind);
+        return new ResolvedLink(
+            typed(type, link.vanilla, bracket),
+            link.mod == link.vanilla ? null : typed(type, link.mod, bracket),
+            link.ownLine,
+            link.actions);
+    }
+
+    /**
+     * {@code Type: link} with the type word in grey. With {@code bracket}, an unbracketed link becomes {@code [link]},
+     * with the link's own click and hover on the brackets too; an already bracketed one (a vanilla item name) keeps its
+     * own.
+     */
+    static IChatComponent typed(String type, IChatComponent link, boolean bracket) {
+        IChatComponent out = new ChatComponentText("");
+        out.appendSibling(ChatStyles.text(type + ": ", EnumChatFormatting.GRAY));
+        if (!bracket || link.getUnformattedText()
+            .startsWith("[")) {
+            out.appendSibling(link);
+            return out;
+        }
+        IChatComponent open = new ChatComponentText("[");
+        open.setChatStyle(
+            link.getChatStyle()
+                .createShallowCopy());
+        IChatComponent close = new ChatComponentText("]");
+        close.setChatStyle(
+            link.getChatStyle()
+                .createShallowCopy());
+        out.appendSibling(open);
+        out.appendSibling(link);
+        out.appendSibling(close);
+        return out;
+    }
+
+    private ResolvedLink resolveKind(Markup.Token token, List<String> warnings) {
         switch (token.kind) {
             case "url":
                 return url(token, warnings);
