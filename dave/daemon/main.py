@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from dave import config  # noqa: E402
-from dave.daemon import envelope  # noqa: E402
+from dave.daemon import envelope, rpc  # noqa: E402
 from dave.daemon.ws import ConnectionClosed, HandshakeError, WebSocket  # noqa: E402
 from dave.launch import dave_cmd  # noqa: E402
 from dave.memory import store as memstore  # noqa: E402
@@ -451,6 +451,7 @@ class Daemon:
         self.transcript = logs / "turns.jsonl"
         self.log_max_bytes = int(setting(cfg, "logs", "max_mb", 10, float) * 1024 * 1024)
         self.log_keep = setting(cfg, "logs", "keep", 5)
+        self.rpc = rpc.BridgeRPC(self, rpc.socket_path(cfg), queries_dir(cfg))
 
     # ---- events
 
@@ -464,6 +465,8 @@ class Daemon:
             self.client_eval.pop(ev.get("playerUuid"), None)
         elif t == "server_stopping":
             log.info("server stopping; waiting for it to come back")
+        elif t == "eval_pending":
+            log.info("eval %s waits for %s to confirm: %s", ev.get("confirmId"), ev.get("player"), ev.get("summary"))
 
     async def on_chat(self, ev):
         if not ev.get("triggered"):
@@ -674,6 +677,7 @@ class Daemon:
         stopper = asyncio.create_task(stop.wait(), name="stop")
         rc = 0
         try:
+            await self.rpc.start()
             await self.claude.start()
             done, _ = await asyncio.wait(tasks | {stopper}, return_when=asyncio.FIRST_COMPLETED)
             for t in done - {stopper}:
@@ -690,11 +694,17 @@ class Daemon:
                 t.cancel()
             await asyncio.gather(*tasks, stopper, return_exceptions=True)
             await self.claude.stop()
+            await self.rpc.stop()
             if self.bridge.ws:
                 await self.bridge.ws.close(1001)
             for sig in signals:
                 loop.remove_signal_handler(sig)
         return rc
+
+
+def queries_dir(cfg):
+    """Saved eval queries: [paths] queries (DAVE_QUERIES_DIR), else <memory>/queries (the memory volume)."""
+    return cfg["paths"].get("queries") or cfg["paths"]["memory"] / "queries"
 
 
 def log_dir(cfg):
@@ -741,6 +751,8 @@ def check(cfg):
     print("token:    %s" % (b["token_source"] or "MISSING"))
     print("bridge:   %s (token %s)" % (cfg["bridge"]["url"], bridge_src or "MISSING"))
     print("memory:   %s" % cfg["paths"]["memory"])
+    print("queries:  %s (starters: %s)" % (queries_dir(cfg), rpc.Queries(queries_dir(cfg)).starter))
+    print("rpc:      %s" % rpc.socket_path(cfg))
     print("log:      %s" % log_dir(cfg))
     for p in b["problems"]:
         print("PROBLEM:  " + p)

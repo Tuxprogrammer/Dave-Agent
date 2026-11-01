@@ -37,6 +37,8 @@ gtnh_src    = "gtnh-src"                   # DAVE_GTNH_SRC     read-only source 
 corpus      = "data/corpus"                # DAVE_CORPUS_DIR   read-only search corpus
 index       = "data/index"                 # DAVE_INDEX_DIR    search indexes
 memory      = "data/memory"                # DAVE_MEMORY_DIR   Dave's memories (a volume in production)
+# queries   = "..."                         # DAVE_QUERIES_DIR  saved eval queries. Unset: <memory>/queries, so they live on the
+                                           #                   memory volume and are exported with it. Starters: dave/queries/
 claude_home = "dave/.claude-home"          # DAVE_CLAUDE_HOME  CLAUDE_CONFIG_DIR and HOME for Dave's claude (git-ignored)
 run         = "dave/.run"                  # DAVE_RUN_DIR      rendered prompt/settings/mcp files, logs (git-ignored)
 workdir     = "/tmp/dave-agent/work"      # DAVE_WORKDIR  Dave's empty cwd. MUST be outside this repo AND the owner's home

@@ -1,5 +1,5 @@
 {
-  "_comment": "Template. dave_cmd.py fills in the placeholders, drops servers whose script does not exist yet, and passes the result via --mcp-config with --strict-mcp-config. Planned servers (recipes, bridge) are listed in dave/TOOLS.md, not here.",
+  "_comment": "Template. dave_cmd.py fills in the placeholders, drops servers whose script does not exist yet, and passes the result via --mcp-config with --strict-mcp-config. Planned servers (recipes) are listed in dave/TOOLS.md, not here.",
   "mcpServers": {
     "dave-memory": {
       "type": "stdio",
@@ -24,6 +24,14 @@
         "GTNH_SEARCH_STATE": "${SEARCH_STATE}",
         "GTNH_MEMORY_DIR": "${MEMORY}",
         "OPENROUTER_API_KEY_FILE": "${OPENROUTER_KEY_FILE}"
+      }
+    },
+    "bridge": {
+      "type": "stdio",
+      "command": "${PYTHON}",
+      "args": ["-I", "${APP}/dave/bridge/server.py"],
+      "env": {
+        "DAVE_BRIDGE_SOCKET": "${BRIDGE_SOCKET}"
       }
     },
     "living-wiki": {

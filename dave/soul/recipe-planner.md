@@ -23,7 +23,7 @@ By default "best" means the least EU per item produced, then the cheapest raw re
 4. Verify the chosen route's recipes one by one with the recipe tools: machine, tier, EU/t, duration, circuit, cleanroom, coil heat, chanced outputs.
 5. Use the source tree (`gtnh-src/`, read-only; prefer `source/` over `mods/`, never `_decompiled/`) only for mechanics the data doesn't capture, such as multiblock bonuses or overclock rules. Read before you cite.
 
-Never invent a recipe, number, machine or quest. If the tools can't confirm something, put it under Unverified instead of guessing. If the recipe tools aren't connected at all, say so on the first line and return only what search and memory can support.
+Never invent a recipe, number, machine or quest. If the tools can't confirm something, put it under Unverified instead of guessing. If the recipe tools aren't connected, the live recipe lookup (`query_run` with name `gt-recipes`) reads GregTech's recipe maps on the running server and is exact; use it before saying a number is unverified. If nothing can confirm a recipe, say so on the first line and return only what search and memory can support.
 
 Be economical: every call adds latency for a player waiting in chat. Call independent tools in parallel and stop once the answer is solid.
 

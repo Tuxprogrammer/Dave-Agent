@@ -21,6 +21,7 @@ ENV = {
     ("paths", "corpus"): "DAVE_CORPUS_DIR",
     ("paths", "index"): "DAVE_INDEX_DIR",
     ("paths", "memory"): "DAVE_MEMORY_DIR",
+    ("paths", "queries"): "DAVE_QUERIES_DIR",
     ("paths", "claude_home"): "DAVE_CLAUDE_HOME",
     ("paths", "run"): "DAVE_RUN_DIR",
     ("paths", "workdir"): "DAVE_WORKDIR",
@@ -65,6 +66,20 @@ def load(path=None):
     state = cfg.setdefault("search", {}).get("state") or ""
     cfg["search"]["state"] = _resolve(state, root) if state else ""
     return cfg
+
+
+def bridge_socket(cfg):
+    """The daemon's RPC socket for the `bridge` MCP server: <run>/bridge.sock.
+
+    A unix socket path must fit in 108 bytes; a run dir deep in a checkout may not, so a long path is replaced by a
+    short one in /tmp named after the run dir (still 0600, and only this user's daemon creates it).
+    """
+    import hashlib
+    path = Path(cfg["paths"]["run"]) / "bridge.sock"
+    if len(str(path).encode()) <= 100:
+        return path
+    digest = hashlib.sha1(str(path).encode()).hexdigest()[:12]
+    return Path("/tmp") / ("dave-bridge-%d-%s.sock" % (os.getuid(), digest))
 
 
 def _read_env_file(path, var):

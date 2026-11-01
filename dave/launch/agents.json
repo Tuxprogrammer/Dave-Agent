@@ -15,7 +15,9 @@
       "mcp__recipes__recipe_uses",
       "mcp__recipes__recipe_get",
       "mcp__recipes__item_find",
-      "mcp__recipes__plan_chain"
+      "mcp__recipes__plan_chain",
+      "mcp__bridge__query_run",
+      "mcp__bridge__query_list"
     ],
     "maxTurns": 40,
     "omitClaudeMd": true
