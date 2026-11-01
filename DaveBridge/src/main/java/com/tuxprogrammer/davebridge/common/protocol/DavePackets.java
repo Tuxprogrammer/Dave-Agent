@@ -27,6 +27,10 @@ public final class DavePackets {
         register(DaveMessage.KIND, DaveMessage.class, Direction.TO_CLIENT);
         register(Thinking.KIND, Thinking.class, Direction.TO_CLIENT);
         register(ClientEvalRequest.KIND, ClientEvalRequest.class, Direction.TO_CLIENT);
+        // Guided demonstrations (lessons)
+        register(Lesson.KIND, Lesson.class, Direction.TO_CLIENT);
+        register(LessonStop.KIND, LessonStop.class, Direction.TO_CLIENT);
+        register(LessonStatus.KIND, LessonStatus.class, Direction.TO_SERVER);
     }
 
     private DavePackets() {}

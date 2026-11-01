@@ -104,6 +104,17 @@ class FakeBridge:
                                               "warnings": w, "reqId": rid}))
                 elif t == "thinking":
                     await ws.send(json.dumps({"type": "ack", "ok": True, "for": "thinking", "reqId": rid}))
+                elif t == "lesson":
+                    if msg.get("player") == "Plain":
+                        await ws.send(json.dumps({"type": "error", "code": "no_client_mod",
+                                                  "message": "Plain doesn't have the client half", "reqId": rid}))
+                    else:
+                        steps = msg.get("lesson", {}).get("steps", [])
+                        await ws.send(json.dumps({"type": "ack", "ok": True, "for": "lesson",
+                                                  "id": msg["lesson"].get("id", "lesson-1"), "steps": len(steps),
+                                                  "dropped": 0, "passTicks": 40, "warnings": [], "reqId": rid}))
+                elif t == "lesson_stop":
+                    await ws.send(json.dumps({"type": "ack", "ok": True, "for": "lesson_stop", "reqId": rid}))
                 elif t == "ping" and not self.ignore_pings:
                     self.tick += 20
                     await ws.send(json.dumps({"type": "pong", "tick": self.tick, "queueDepth": 0, "reqId": rid}))
@@ -427,6 +438,33 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         await until(lambda: ("Bob", main.NOTICE_LIMIT) in self.bridge.says())
         await self.bridge.chat("Carl", "still alive?")
         await until(lambda: ("@a", "hello Carl") in self.bridge.says())
+
+    async def test_lesson_helpers_and_events(self):
+        await self.start()
+        b = self.daemon.bridge
+        lesson = {"id": "ebf", "steps": [{"walkTo": [1, 64, 2]}, {"say": "here"}]}
+        r = await b.lesson("Steve", lesson)
+        self.assertEqual((r["type"], r["id"], r["steps"]), ("ack", "ebf", 2))
+        sent = self.bridge.of("lesson")[-1]
+        self.assertEqual((sent["player"], sent["lesson"]), ("Steve", lesson))
+        r = await b.lesson("Plain", lesson)
+        self.assertEqual((r["type"], r["code"]), ("error", "no_client_mod"))
+        r = await b.lesson_stop("Steve", "ebf")
+        self.assertEqual(r["type"], "ack")
+        self.assertEqual(self.bridge.of("lesson_stop")[-1], dict(type="lesson_stop", player="Steve", id="ebf",
+                                                                  reqId=r["reqId"]))
+        await b.lesson_stop("Steve")
+        self.assertNotIn("id", self.bridge.of("lesson_stop")[-1])
+
+        uid = "00000000-0000-0000-0000-000000000042"
+        await self.bridge.send_raw(json.dumps({"type": "client_mod", "player": "Steve", "playerUuid": uid,
+                                               "capabilities": ["render", "lesson"], "clientEvalAllowed": False}))
+        await until(lambda: uid in self.daemon.lesson_capable)
+        await self.bridge.send_raw(json.dumps({"type": "lesson_status", "player": "Steve", "playerUuid": uid,
+                                               "id": "ebf", "state": "stopped", "reason": "player"}))
+        await until(lambda: self.daemon.lesson_status.get(uid, {}).get("reason") == "player")
+        await self.bridge.send_raw(json.dumps({"type": "player_leave", "player": "Steve", "playerUuid": uid}))
+        await until(lambda: uid not in self.daemon.lesson_capable)
 
     async def test_reconnect(self):
         await self.start()

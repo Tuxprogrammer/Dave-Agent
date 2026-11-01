@@ -6,6 +6,7 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.client.ClientCommandHandler;
 
 import com.tuxprogrammer.davebridge.DaveBridge;
+import com.tuxprogrammer.davebridge.client.lesson.LessonClient;
 import com.tuxprogrammer.davebridge.common.CommonProxy;
 import com.tuxprogrammer.davebridge.common.network.DaveNetwork;
 import com.tuxprogrammer.davebridge.common.protocol.ClientEvalRequest;
@@ -80,12 +81,14 @@ public class ClientProxy extends CommonProxy {
         FMLCommonHandler.instance()
             .bus()
             .register(new ClientEventHandler());
+        LessonClient.preInit(); // guided demonstrations
     }
 
     @Override
     public void init(FMLInitializationEvent event) {
         super.init(event);
         ClientRegistry.registerKeyBinding(ASK_KEY);
+        LessonClient.init();
         ClientCommandHandler.instance.registerCommand(new ClientCommandDaveBridge());
     }
 }

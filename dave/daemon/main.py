@@ -206,6 +206,21 @@ class Bridge:
         except (BridgeDown, asyncio.TimeoutError):
             pass
 
+    async def lesson(self, player, lesson, timeout=15):
+        """Sends one player a guided demonstration (DaveBridge PROTOCOL.md 1.4 `lesson`).
+
+        `lesson` is the step-list object ({"id", "title", "loop", "speed", "steps": [...]}). Returns the server's
+        reply: an `ack` with id, steps, dropped, passTicks and warnings, or an `error`. Code `no_client_mod` means
+        the player can't see lessons (no DaveBridge client half): explain in chat instead."""
+        return await self.request({"type": "lesson", "player": player, "lesson": lesson}, timeout)
+
+    async def lesson_stop(self, player, lesson_id=None, timeout=10):
+        """Stops the player's lesson (`lesson_id`, or whatever is playing). Returns the ack or error."""
+        msg = {"type": "lesson_stop", "player": player}
+        if lesson_id:
+            msg["id"] = lesson_id
+        return await self.request(msg, timeout)
+
     async def thinking(self, player):
         try:
             await self.request({"type": "thinking", "target": player}, timeout=10)
@@ -442,6 +457,8 @@ class Daemon:
         self.free_since = 0.0                  # when the worker last finished a turn (waiting behind Dave isn't stale)
         self.last_ask = {}                     # player key -> monotonic time of their last accepted ask
         self.client_eval = {}                  # uuid -> clientEvalAllowed from client_mod
+        self.lesson_capable = set()            # uuids whose client half plays lessons ("lesson" capability)
+        self.lesson_status = {}                # uuid -> last lesson_status event (how their last lesson ended)
         self.warnings = []                     # (turn id, text) from the last say ack, for the next turn
         self.recent = collections.deque(maxlen=6)
         self.fresh_session = True              # next turn is the first of a session: add <recent>
@@ -460,8 +477,16 @@ class Daemon:
             await self.on_chat(ev)
         elif t == "client_mod":
             self.client_eval[ev.get("playerUuid")] = bool(ev.get("clientEvalAllowed"))
+            if "lesson" in (ev.get("capabilities") or []):
+                self.lesson_capable.add(ev.get("playerUuid"))
+            else:
+                self.lesson_capable.discard(ev.get("playerUuid"))
+        elif t == "lesson_status":
+            self.lesson_status[ev.get("playerUuid")] = ev
+            log.info("lesson %s for %s %s (%s)", ev.get("id"), ev.get("player"), ev.get("state"), ev.get("reason"))
         elif t == "player_leave":
             self.client_eval.pop(ev.get("playerUuid"), None)
+            self.lesson_capable.discard(ev.get("playerUuid"))
         elif t == "server_stopping":
             log.info("server stopping; waiting for it to come back")
 

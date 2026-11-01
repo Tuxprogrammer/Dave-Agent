@@ -9,6 +9,7 @@ import com.tuxprogrammer.davebridge.common.tasks.MainThreadQueue;
 import com.tuxprogrammer.davebridge.server.bridge.BridgeService;
 import com.tuxprogrammer.davebridge.server.chat.ChatHandlers;
 import com.tuxprogrammer.davebridge.server.command.CommandDave;
+import com.tuxprogrammer.davebridge.server.lesson.LessonService;
 import com.tuxprogrammer.davebridge.server.network.ServerPacketHandlers;
 
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -36,6 +37,7 @@ public final class DaveServer {
         QUEUE.setMaxDepth(Config.maxQueueDepth);
         ChatHandlers.register(BRIDGE.router());
         ServerPacketHandlers.register();
+        LessonService.register(BRIDGE.router());
 
         ServerEventHandler handler = new ServerEventHandler();
         MinecraftForge.EVENT_BUS.register(handler); // ServerChatEvent
