@@ -56,6 +56,19 @@ public final class Config {
     public static volatile int tickBudgetMillis = 5;
     public static volatile int maxQueueDepth = 1000;
 
+    // eval (milestone 2)
+    public static final String CATEGORY_EVAL = "eval";
+    public static volatile boolean evalEnabled = true;
+    public static volatile int evalTimeoutMillis = 500;
+    public static volatile int evalMaxTimeoutMillis = 5000;
+    public static volatile int evalMaxResultChars = 64 * 1024;
+    public static volatile int evalMaxOutputChars = 16 * 1024;
+    public static volatile int confirmTimeoutSeconds = 120;
+    public static volatile int confirmMaxTimeoutSeconds = 600;
+    public static volatile String backupCommand = "";
+    public static volatile boolean clientEvalRelay = true;
+    public static volatile int clientEvalTimeoutSeconds = 30;
+
     /** A non-empty {@code authToken} line as Forge writes it, e.g. {@code S:authToken=...}. */
     private static final Pattern TOKEN_LINE = Pattern.compile("(?m)^\\s*S:\"?authToken\"?\\s*=\\s*\\S");
 
@@ -223,11 +236,76 @@ public final class Config {
         maxQueueDepth = cfg
             .getInt("maxQueueDepth", CATEGORY_QUEUE, 1000, 10, 100000, "Further tasks are rejected while this full.");
 
+        loadEval(cfg);
+
         if (cfg.hasChanged()) {
             cfg.save();
         }
         loaded = true;
         return true;
+    }
+
+    private static void loadEval(Configuration cfg) {
+        cfg.setCategoryComment(
+            CATEGORY_EVAL,
+            "Live eval: Groovy scripts from the agent, run on the server thread (PROTOCOL.md 1.8). Trusted players only.");
+        evalEnabled = cfg
+            .getBoolean("evalEnabled", CATEGORY_EVAL, true, "Accept eval and describe requests from the agent.");
+        evalTimeoutMillis = cfg.getInt(
+            "evalTimeoutMillis",
+            CATEGORY_EVAL,
+            500,
+            10,
+            60000,
+            "Default time limit of one script. It holds the server tick while it runs.");
+        evalMaxTimeoutMillis = cfg.getInt(
+            "evalMaxTimeoutMillis",
+            CATEGORY_EVAL,
+            5000,
+            10,
+            60000,
+            "Largest time limit a request may ask for (timeoutMs).");
+        evalMaxResultChars = cfg.getInt(
+            "evalMaxResultChars",
+            CATEGORY_EVAL,
+            64 * 1024,
+            1024,
+            4 * 1024 * 1024,
+            "Approximate size cap of a script's JSON result.");
+        evalMaxOutputChars = cfg
+            .getInt("evalMaxOutputChars", CATEGORY_EVAL, 16 * 1024, 0, 1024 * 1024, "Printed output kept per script.");
+        confirmTimeoutSeconds = cfg.getInt(
+            "confirmTimeoutSeconds",
+            CATEGORY_EVAL,
+            120,
+            5,
+            3600,
+            "How long a world-changing script waits for the player's Confirm click by default.");
+        confirmMaxTimeoutSeconds = cfg.getInt(
+            "confirmMaxTimeoutSeconds",
+            CATEGORY_EVAL,
+            600,
+            5,
+            3600,
+            "Longest confirm wait a request may ask for.");
+        backupCommand = cfg.getString(
+            "backupCommand",
+            CATEGORY_EVAL,
+            "",
+            "Server command run (as the server) right before a confirmed world-changing script, e.g. 'backup start' "
+                + "(ServerUtilities; it copies in the background). Empty: none.");
+        clientEvalRelay = cfg.getBoolean(
+            "clientEvalRelay",
+            CATEGORY_EVAL,
+            true,
+            "Relay client_eval to players who opted in on their own client. Players who did not opt in never get it.");
+        clientEvalTimeoutSeconds = cfg.getInt(
+            "clientEvalTimeoutSeconds",
+            CATEGORY_EVAL,
+            30,
+            1,
+            600,
+            "How long to wait for a client's eval result.");
     }
 
     private static byte[] readIfPresent(File file) {

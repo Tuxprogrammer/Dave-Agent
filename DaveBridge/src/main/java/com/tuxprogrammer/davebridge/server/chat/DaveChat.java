@@ -63,7 +63,11 @@ public final class DaveChat {
 
     private DaveChat() {}
 
-    /** {@code "@a"} (or empty) for everyone online, otherwise one player by name (case-insensitive). */
+    /**
+     * {@code "@a"} (or empty) for everyone online, otherwise one player by name (case-insensitive). A named player who
+     * is not online resolves to nobody (the caller reports it as a warning): the asker may have left, or be a
+     * {@code /dave ask} test name, and the reply must not fail because of that.
+     */
     public static List<EntityPlayerMP> resolveTargets(String target) throws ProtocolException {
         List<EntityPlayerMP> online = onlinePlayers();
         if (isEveryone(target)) {
@@ -77,7 +81,7 @@ public final class DaveChat {
                 return one;
             }
         }
-        throw new ProtocolException(Protocol.ERR_NOT_FOUND, "player '" + target + "' is not online");
+        return new ArrayList<>();
     }
 
     static boolean isEveryone(String target) {
@@ -101,6 +105,9 @@ public final class DaveChat {
         throws ProtocolException {
         List<EntityPlayerMP> recipients = resolveTargets(target);
         List<String> warnings = new ArrayList<>();
+        if (!isEveryone(target) && recipients.isEmpty()) {
+            warnings.add("player '" + target + "' is not online; the whisper was dropped");
+        }
         MarkupRenderer.Rendered rendered;
         if (components != null) {
             rendered = fromComponents(components, warnings);

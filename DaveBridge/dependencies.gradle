@@ -37,6 +37,9 @@ dependencies {
     // WebSocket server for the agent bridge. Shaded and relocated under com.tuxprogrammer.davebridge.shadow.
     // Pulls in slf4j-api transitively (also shaded); with no slf4j provider present it logs nothing.
     shadowImplementation("org.java-websocket:Java-WebSocket:1.6.0")
+    // Groovy for live eval (milestone 2). Apache-2.0. Shaded and relocated like the WebSocket library, so it can
+    // never clash with another mod's Groovy. Core module only: no grape, json, xml or templates.
+    shadowImplementation("org.apache.groovy:groovy:4.0.33")
 
     // Native chat integrations (optional at runtime, guarded by Loader.isModLoaded). Versions pinned to GTNH 2.9.0.
     // devOnlyNonPublishable = compile against them and load them in runServer/runClient, never published or shaded.
@@ -53,3 +56,175 @@ dependencies {
 tasks.named("test", Test) {
     useJUnitPlatform()
 }
+
+// ---- Live eval (milestone 2) build steps ------------------------------------------------------------------------
+
+/**
+ * Groovy stores class names as data, which the shadow relocation cannot see:
+ *  - META-INF/dgminfo lists every DefaultGroovyMethods helper class and its parameter types by name. Unrelocated,
+ *    the relocated runtime fails to load them (no `each`, `collect`, `println`, ...).
+ *  - META-INF/services/...ASTTransformation names Grape's @Grab transform, which we do not ship.
+ * This rewrites the first and drops the second, in the shaded jar, before reobfJar reads it.
+ */
+class GroovyShadowFix {
+
+    static final String DGMINFO = "META-INF/dgminfo"
+    static final String GLOBAL_TRANSFORMS = "META-INF/services/org.codehaus.groovy.transform.ASTTransformation"
+    static final List<String> PACKAGES = ["groovy.", "groovyjarjar", "org.codehaus.groovy.", "org.apache.groovy."]
+
+    static String relocate(String name, String prefix) {
+        int dims = 0
+        while (dims < name.length() && name.charAt(dims) == ('[' as char)) dims++
+        if (dims > 0 && name.length() > dims && name.charAt(dims) == ('L' as char)) {
+            return name.substring(0, dims + 1) + relocate(name.substring(dims + 1), prefix)
+        }
+        for (String p : PACKAGES) {
+            if (name.startsWith(p)) return prefix + name
+            // the helper class names (dgm$N) are stored in internal form: org/codehaus/groovy/runtime/dgm$0
+            if (name.startsWith(p.replace('.', '/'))) return prefix.replace('.', '/') + name
+        }
+        return name
+    }
+
+    /** Format: (UTF class name, int id)* until "", int count, then records (UTF class, UTF method, int, int n, n ints). */
+    static byte[] rewriteDgmInfo(byte[] data, String prefix) {
+        def input = new DataInputStream(new ByteArrayInputStream(data))
+        def bytes = new ByteArrayOutputStream()
+        def out = new DataOutputStream(bytes)
+        while (true) {
+            String name = input.readUTF()
+            out.writeUTF(name.isEmpty() ? name : relocate(name, prefix))
+            if (name.isEmpty()) break
+            out.writeInt(input.readInt())
+        }
+        int count = input.readInt()
+        out.writeInt(count)
+        for (int i = 0; i < count; i++) {
+            out.writeUTF(relocate(input.readUTF(), prefix))
+            out.writeUTF(input.readUTF())
+            out.writeInt(input.readInt())
+            int n = input.readInt()
+            out.writeInt(n)
+            for (int j = 0; j < n; j++) out.writeInt(input.readInt())
+        }
+        if (input.read() != -1) throw new IllegalStateException("unexpected data after the dgminfo records")
+        out.flush()
+        return bytes.toByteArray()
+    }
+
+    /**
+     * Java 9+ only: vmplugin/v9/Java9.getDefaultImportClasses sorts the default import packages with
+     * pn.startsWith("groovy/"), a literal the relocation cannot recognize, and throws "BUG! unexpected package" for
+     * the relocated ones. Rewrites that one constant-pool string (Utf8 entries are length-prefixed, nothing points
+     * into them by offset, so changing the length is safe).
+     */
+    static byte[] patchUtf8(byte[] cls, String from, String to) {
+        def input = new DataInputStream(new ByteArrayInputStream(cls))
+        def bytes = new ByteArrayOutputStream()
+        def out = new DataOutputStream(bytes)
+        out.writeInt(input.readInt())       // magic
+        out.writeShort(input.readUnsignedShort())
+        out.writeShort(input.readUnsignedShort())
+        int count = input.readUnsignedShort()
+        out.writeShort(count)
+        int patched = 0
+        for (int i = 1; i < count; i++) {
+            int tag = input.readUnsignedByte()
+            out.writeByte(tag)
+            switch (tag) {
+                case 1:
+                    String s = input.readUTF()
+                    if (s == from) { s = to; patched++ }
+                    out.writeUTF(s)
+                    break
+                case 3: case 4: out.writeInt(input.readInt()); break
+                case 5: case 6: out.writeLong(input.readLong()); i++; break
+                case 7: case 8: case 16: case 19: case 20: out.writeShort(input.readUnsignedShort()); break
+                case 9: case 10: case 11: case 12: case 17: case 18: out.writeInt(input.readInt()); break
+                case 15: out.writeByte(input.readUnsignedByte()); out.writeShort(input.readUnsignedShort()); break
+                default: throw new IllegalStateException("unknown constant pool tag " + tag)
+            }
+        }
+        if (patched != 1) throw new IllegalStateException("expected one '" + from + "' constant, found " + patched)
+        out.write(input.readAllBytes())
+        out.flush()
+        return bytes.toByteArray()
+    }
+
+    static void fix(File jar, String prefix) {
+        File tmp = new File(jar.parentFile, jar.name + ".groovyfix")
+        boolean sawDgm = false
+        boolean sawJava9 = false
+        String java9 = prefix.replace('.', '/') + "org/codehaus/groovy/vmplugin/v9/Java9.class"
+        def zip = new java.util.zip.ZipFile(jar)
+        def zos = new java.util.zip.ZipOutputStream(new FileOutputStream(tmp))
+        try {
+            for (java.util.zip.ZipEntry e : java.util.Collections.list(zip.entries())) {
+                if (e.name == GLOBAL_TRANSFORMS) continue
+                byte[] content = zip.getInputStream(e).bytes
+                if (e.name == DGMINFO) {
+                    content = rewriteDgmInfo(content, prefix)
+                    sawDgm = true
+                }
+                if (e.name == java9) {
+                    content = patchUtf8(content, "groovy/", prefix.replace('.', '/') + "groovy/")
+                    sawJava9 = true
+                }
+                def copy = new java.util.zip.ZipEntry(e.name)
+                copy.time = e.time
+                zos.putNextEntry(copy)
+                zos.write(content)
+                zos.closeEntry()
+            }
+        } finally {
+            zos.close()
+            zip.close()
+        }
+        if (!sawDgm || !sawJava9) {
+            throw new IllegalStateException("no " + DGMINFO + " or " + java9 + " in " + jar + ": is Groovy still shaded?")
+        }
+        java.nio.file.Files.move(tmp.toPath(), jar.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    }
+}
+
+tasks.named("shadowJar").configure {
+    def shadedJar = it.archiveFile
+    def prefix = "${project.property('modGroup')}.shadow."
+    doLast {
+        GroovyShadowFix.fix(shadedJar.get().asFile, prefix)
+    }
+}
+
+/**
+ * MCP names for runtime translation (eval scripts may write player.inventory; at runtime the field is
+ * field_71071_by). Generated from the MCP mappings RetroFuturaGradle already downloads for this build (channel and
+ * version from gradle.properties), so no mapping data is committed. One "srg<TAB>mcp" line per member.
+ */
+def srgNamesOut = layout.buildDirectory.dir("generated/davebridge-srgnames")
+def mcpDir = new File(gradle.gradleUserHomeDir,
+    "caches/minecraft/de/oceanlabs/mcp/mcp_${project.property('channel')}/${project.property('mappingsVersion')}")
+def generateSrgNames = tasks.register("generateSrgNames") {
+    dependsOn("generateForgeSrgMappings")
+    def fields = new File(mcpDir, "fields.csv")
+    def methods = new File(mcpDir, "methods.csv")
+    def mappingName = mcpDir.parentFile.name + "/" + mcpDir.name
+    inputs.files(fields, methods)
+    outputs.dir(srgNamesOut)
+    doLast {
+        def lines = new TreeSet<String>()
+        for (File csv : [fields, methods]) {
+            if (!csv.isFile()) throw new GradleException("MCP mappings not found at " + csv)
+            csv.eachLine { line, n ->
+                if (n == 1) return
+                def cols = line.split(",", 3)
+                if (cols.length >= 2 && (cols[0].startsWith("field_") || cols[0].startsWith("func_"))) {
+                    lines.add(cols[0] + "\t" + cols[1])
+                }
+            }
+        }
+        def out = new File(srgNamesOut.get().asFile, "assets/davebridge/eval/srg-names.tsv")
+        out.parentFile.mkdirs()
+        out.text = "# srg<TAB>mcp, from MCP mappings " + mappingName + "\n" + String.join("\n", lines) + "\n"
+    }
+}
+sourceSets.main.resources.srcDir(generateSrgNames)
