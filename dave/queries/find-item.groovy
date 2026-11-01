@@ -18,24 +18,9 @@ if (!want) return [error: 'give item']
 Integer onlyDim = params.dim != null ? (params.dim as int) : null
 int limit = Math.min(30, (params.limit ?: 8) as int)
 
-def wantItem = null; Integer wantMeta = null; Set wantOre = null; String wantName = null
-if (want.startsWith('ore:')) {
-    wantOre = OreDictionary.getOres(want.substring(4)).collect { [it.getItem(), it.getItemDamage()] } as Set
-    if (!wantOre) return [error: "no items with ore name ${want.substring(4)}"]
-} else if (want.contains(':')) {
-    def parts = want.split(':')
-    wantItem = Item.itemRegistry.getObject(parts[0] + ':' + parts[1])
-    if (parts.length > 2) wantMeta = parts[2] as int
-    if (wantItem == null) return [error: "unknown item id ${parts[0]}:${parts[1]}"]
-} else {
-    wantName = want.toLowerCase()
-}
-def matches = { ItemStack s ->
-    if (s == null || s.getItem() == null) return false
-    if (wantItem != null) return s.getItem().is(wantItem) && (wantMeta == null || s.getItemDamage() == wantMeta)
-    if (wantOre != null) return wantOre.any { it[0].is(s.getItem()) && (it[1] == s.getItemDamage() || it[1] == 32767) }
-    try { return s.getDisplayName().toLowerCase().contains(wantName) } catch (Throwable e) { return false }
-}
+def matcher = dave.items(want)                      // Java-side matcher: id, ore: or name fragment
+if (matcher.error) return [error: matcher.error]
+def matches = { s -> s != null && matcher.test(s) }
 
 def cls = { String n -> try { return dave.cls(n) } catch (Throwable e) { return null } }
 def drawerGroup = cls('com.jaquadro.minecraft.storagedrawers.api.storage.IDrawerGroup')
@@ -88,13 +73,13 @@ for (w in dave.worlds()) {
         if (te.metaClass.respondsTo(te, 'getMetaTileEntity')) {
             def mte = te.getMetaTileEntity()
             if (mte == null) continue
-            try { name = mte.getLocalName() } catch (ignored) { }
+            try { name = mte.getLocalName() } catch (Throwable ignored) { }
             if (quantumChest != null && quantumChest.isInstance(mte) && mte.mItemStack != null && matches(mte.mItemStack)) {
                 n += mte.mItemCount; itemName = mte.mItemStack.getDisplayName(); kind = 'GT digital chest'
             }
         }
         if (te instanceof IInventory) {
-            try { name = (kind == 'inventory' && te.hasCustomInventoryName()) ? te.getInventoryName() : name } catch (ignored) { }
+            try { name = (kind == 'inventory' && te.hasCustomInventoryName()) ? te.getInventoryName() : name } catch (Throwable ignored) { }
             int size = te.getSizeInventory()
             for (int i = 0; i < size; i++) {
                 def s = te.getStackInSlot(i)

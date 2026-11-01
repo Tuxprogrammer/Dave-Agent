@@ -330,8 +330,15 @@ util,world}`, `net.minecraftforge.{common.util,fluids,oredict}`); other classes 
 
 **MCP names work at runtime.** Outside the dev environment vanilla members only exist under SRG names
 (`field_71071_by`). When a property or method of a Minecraft-hierarchy class is missing, it is retried under each
-SRG name of that MCP name (table generated at build time from the MCP mappings), so `player.inventory`,
-`entity.getHealth()`, `entity.health` and `Blocks.stone` all work. Mod classes keep their real names.
+SRG name of that MCP name (table generated at build time from Forge's own mapping, the names mod source uses,
+plus MCP stable_12, the names in the decompiled vanilla source), so `player.inventory`, `entity.getHealth()`,
+`entity.health`, `stack.getItemDamage()` / `stack.getMetadata()` and `Blocks.stone` all work. Mod classes keep their
+real names. On a dedicated server some mod classes declare client-only signatures without `@SideOnly`, so Java cannot
+list their members; Groovy then dispatches through their nearest listable superclass (overrides still run), and
+methods only that class declares are out of reach.
+
+`dave.items(spec)` (a fast stack matcher) and `dave.gtRecipes(item, fluid, uses, map, limit)` (every GregTech
+recipe map scanned in Java, tens to a few hundred milliseconds) keep heavy lookups off Groovy's dynamic dispatch.
 
 **Safeguards.**
 - Compiled off the server thread, then run on it through the main-thread queue (section 3).
@@ -606,6 +613,11 @@ online:
   online player's, else the overworld spawn (dim 0). Replies need no player online: a public reply is broadcast as
   usual, a whisper to an absent name is dropped with a warning in the `say` ack.
 - `/dave pending`: lists the changes waiting for a confirm (`id`, asking player, seconds left, summary).
+
+`DaveBridge/tools/eval_check.py` runs these against a test server (agent socket plus RCON: reads, timeouts, blocked
+calls, describe, a confirmed and a cancelled write, an expiry, `/dave ask`, the starter queries; `--gt` adds the
+GregTech checks). It places one glass block 40 above spawn and removes it again. `dave/daemon/e2e_bridge_check.py`
+does the same through the real daemon and the `bridge` MCP server, with a fake Claude (no model calls).
 
 Client half only:
 

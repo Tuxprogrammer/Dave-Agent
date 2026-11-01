@@ -38,16 +38,16 @@ Dave runs on the **Claude Code CLI** with a Claude subscription, not with API to
 
 - [ ] **M1: Chat bridge.** Mod skeleton with the client/server split, WebSocket, chat in and out, the `davebridge` packet channel (client hello, ask with context, Dave messages), `/dave status` and `/dave reload`. *(in progress)*
 - [ ] **M1: Source tree.** GTNH 2.9.0 decompiled into `gtnh-src/`. *(in progress)*
-- [ ] **M2: Live eval.** Groovy engine on the main-thread queue with a per-tick time budget, MCP to SRG name mapping, a capped JSON serializer, and the introspection API. Eval works on the server, and on opted-in clients by way of the server relay. It ships with a starter set of saved **world lookups**, each answered with a `{waypoint:}` link:
+- [x] **M2: Live eval.** Groovy engine on the main-thread queue with a per-tick time budget, MCP to SRG name mapping, a capped JSON serializer, and the introspection API (`describe`). Eval works on the server, and on opted-in clients by way of the server relay. Dave reaches it through the `bridge` MCP server (`eval`, `describe`, saved queries; see dave/TOOLS.md). World-changing scripts wait for the asking player's in-game Confirm (with an optional backup command first), and `/dave ask`, `/dave pending` and console `/dave confirm` let an op exercise everything over RCON. It ships with a live GregTech recipe lookup (`gt-recipes`) and a starter set of saved **world lookups**, each answered with a `{waypoint:}` link *(client eval verified only against a scripted client so far)*:
 - **Where is my machine:** found by type or name.
 - **Which chest, drawer or AE network holds an item.**
-- **Where is the nearest ore vein of X:** from GregTech's ore-vein data and generated chunks; also check what VisualProspecting already stores before writing our own.
+- **Where is the nearest ore vein of X:** from the veins VisualProspecting records server-side as chunks generate (GT keeps no saved vein list).
 - **Where is loot or a structure.**
 - [x] **M3: Daemon (chat loop).** `dave/daemon/`: the DaveBridge WebSocket, the long-lived Claude process, the turn envelope with memory, the reply directives, per-player cooldowns and queue caps, session rotation, crash resume and reconnects. Tested against a fake bridge and live with Dave on 2026-11-01. The bridge MCP tools (`eval`, `describe`, saved queries) come with M2.
 - [ ] **Recipe knowledge.** Our own recipe export into a SQLite database, a `gtnh_search` semantic search over the quest book, wiki, GuideNH and item cards, and a `plan_chain` LP optimizer. See [docs/plans/recipe-knowledge.md](docs/plans/recipe-knowledge.md).
 - [ ] **Guided demonstrations ("Show me").** A client-only ghost Dave walks the player through a task in their world, with ghost blocks and labels, looping until they stop it. See [docs/plans/guided-demos.md](docs/plans/guided-demos.md).
 - [ ] **Distribution: the `tuxmine` packwiz pack.** packwiz-installer runs as a Prism pre-launch command and keeps DaveBridge, GregGuns and TrainHorizons up to date on every client and on the server. *(skeleton in place; hosting decision pending)*
-- [ ] **M4: Polish.** Clickable confirm buttons for scripts that change the world, a backup before writes, the saved-query library, and event-hook subscriptions.
+- [ ] **M4: Polish.** Event-hook subscriptions; a real snapshot/undo for world changes (M2 only runs a configurable backup command). Confirm buttons and the saved-query library landed with M2.
 
 ## Running Dave on a subscription
 

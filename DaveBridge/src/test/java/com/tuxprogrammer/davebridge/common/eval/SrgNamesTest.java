@@ -37,5 +37,21 @@ class SrgNamesTest {
             n.srgMethods("getHealth")
                 .contains("func_110143_aJ"));
         assertEquals("posX", n.mcp("field_70165_t"));
+        // Forge's dev names (what mod source calls) and stable_12's newer names (gtnh-src/minecraft) both work
+        assertTrue(
+            n.srgMethods("getItemDamage")
+                .contains("func_77960_j"));
+        assertTrue(
+            n.srgMethods("getMetadata")
+                .contains("func_77960_j"));
+        assertEquals("getItemDamage", n.mcp("func_77960_j"));
+    }
+
+    @Test
+    void anSrgNameMayHaveTwoNames() throws Exception {
+        SrgNames n = SrgNames.parse(new StringReader("func_1_a\told\nfunc_1_a\tnew\n"));
+        assertEquals("old", n.mcp("func_1_a"));
+        assertEquals(Collections.singletonList("func_1_a"), n.srgMethods("new"));
+        assertEquals(Collections.singletonList("func_1_a"), n.srgMethods("old"));
     }
 }

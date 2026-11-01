@@ -100,6 +100,20 @@ public final class ServerEvalHelpers extends EvalHelpers {
         return Describe.looking(player, 64);
     }
 
+    /** A fast item matcher: {@code modid:name[:meta]}, {@code ore:<name>} or a display-name fragment. */
+    public RecipeScan.ItemMatcher items(String spec) {
+        return RecipeScan.ItemMatcher.of(spec);
+    }
+
+    /**
+     * GregTech recipes that make ({@code uses=false}) or consume an item ({@code itemSpec}) or a fluid
+     * ({@code fluid}), scanned in Java: {@code [matched: n, recipes: [[map: name, recipe: GTRecipe], ...]]}.
+     */
+    public Map<String, Object> gtRecipes(String itemSpec, String fluid, boolean uses, String mapFilter, int limit)
+        throws ReflectiveOperationException {
+        return RecipeScan.gtRecipes(itemSpec, fluid, uses, mapFilter, limit);
+    }
+
     /** Squared distance between a player and a position (same dimension assumed). */
     public static double dist2(EntityPlayerMP p, double x, double y, double z) {
         double dx = p.posX - x, dy = p.posY - y, dz = p.posZ - z;

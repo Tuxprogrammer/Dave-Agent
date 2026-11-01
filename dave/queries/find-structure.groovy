@@ -49,7 +49,7 @@ if (want == 'all' || want == 'spawner') {
     for (te in dave.tiles(w)) {
         if (!(te instanceof TileEntityMobSpawner)) continue
         String mob = '?'
-        try { mob = te.func_145881_a().getEntityNameToSpawn() } catch (ignored) { }
+        try { mob = te.func_145881_a().getEntityNameToSpawn() } catch (Throwable ignored) { }
         double dx = te.xCoord - px, dz = te.zCoord - pz
         hits << [kind: 'Spawner', id: mob + ' spawner', x: te.xCoord, y: te.yCoord, z: te.zCoord, dim: dim,
                  distance: Math.round(Math.sqrt(dx * dx + dz * dz)),

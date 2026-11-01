@@ -197,34 +197,42 @@ tasks.named("shadowJar").configure {
 
 /**
  * MCP names for runtime translation (eval scripts may write player.inventory; at runtime the field is
- * field_71071_by). Generated from the MCP mappings RetroFuturaGradle already downloads for this build (channel and
- * version from gradle.properties), so no mapping data is committed. One "srg<TAB>mcp" line per member.
+ * field_71071_by). Generated from the mappings the build already downloads, so no mapping data is committed:
+ *  1. Forge's own conf (the names this dev environment and every mod's source use, e.g. ItemStack.getItemDamage);
+ *  2. MCP stable_12 from gradle.properties (newer names, used by the decompiled vanilla in gtnh-src, e.g.
+ *     ItemStack.getMetadata for the same func_77960_j).
+ * One "srg<TAB>name" line per pair; an SRG name may appear twice, Forge's name first (it is the one shown back).
  */
 def srgNamesOut = layout.buildDirectory.dir("generated/davebridge-srgnames")
 def mcpDir = new File(gradle.gradleUserHomeDir,
     "caches/minecraft/de/oceanlabs/mcp/mcp_${project.property('channel')}/${project.property('mappingsVersion')}")
+def mcVersion = project.property('minecraftVersion')
+def forgeConfDir = new File(gradle.gradleUserHomeDir,
+    "caches/minecraft/net/minecraftforge/forge/${mcVersion}-${project.property('forgeVersion')}-${mcVersion}/unpacked/conf")
 def generateSrgNames = tasks.register("generateSrgNames") {
     dependsOn("generateForgeSrgMappings")
-    def fields = new File(mcpDir, "fields.csv")
-    def methods = new File(mcpDir, "methods.csv")
-    def mappingName = mcpDir.parentFile.name + "/" + mcpDir.name
-    inputs.files(fields, methods)
+    def csvs = [new File(forgeConfDir, "fields.csv"), new File(forgeConfDir, "methods.csv"),
+                new File(mcpDir, "fields.csv"), new File(mcpDir, "methods.csv")]
+    def mappingName = "Forge " + project.property('forgeVersion') + " conf + " + mcpDir.parentFile.name + "/" + mcpDir.name
+    inputs.files(csvs)
     outputs.dir(srgNamesOut)
     doLast {
-        def lines = new TreeSet<String>()
-        for (File csv : [fields, methods]) {
-            if (!csv.isFile()) throw new GradleException("MCP mappings not found at " + csv)
+        def lines = new LinkedHashSet<String>()
+        for (File csv : csvs) {
+            if (!csv.isFile()) throw new GradleException("Mappings not found at " + csv + " (RetroFuturaGradle downloads them)")
+            def rows = new TreeSet<String>()
             csv.eachLine { line, n ->
                 if (n == 1) return
                 def cols = line.split(",", 3)
                 if (cols.length >= 2 && (cols[0].startsWith("field_") || cols[0].startsWith("func_"))) {
-                    lines.add(cols[0] + "\t" + cols[1])
+                    rows.add(cols[0] + "\t" + cols[1])
                 }
             }
+            lines.addAll(rows)
         }
         def out = new File(srgNamesOut.get().asFile, "assets/davebridge/eval/srg-names.tsv")
         out.parentFile.mkdirs()
-        out.text = "# srg<TAB>mcp, from MCP mappings " + mappingName + "\n" + String.join("\n", lines) + "\n"
+        out.text = "# srg<TAB>name, from " + mappingName + "\n" + String.join("\n", lines) + "\n"
     }
 }
 sourceSets.main.resources.srcDir(generateSrgNames)

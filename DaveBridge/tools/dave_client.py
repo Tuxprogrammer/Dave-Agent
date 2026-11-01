@@ -130,7 +130,10 @@ async def selftest(url, token):
 
         await ws.send(json.dumps({"type": "say", "target": "NoSuchPlayer", "text": "hi", "reqId": 5}))
         msg = await recv_until(ws, lambda m: m.get("reqId") == 5)
-        check("say to offline player -> error not_found", msg.get("code") == "not_found", msg)
+        # since 0.2.0: an absent target is not an error (the asker may have left, or be a /dave ask test name)
+        check("say to offline player -> ack, 0 recipients, warning",
+              msg.get("type") == "ack" and msg.get("recipients") == 0
+              and any("not online" in w for w in msg.get("warnings", [])), msg)
     finally:
         await ws.close()
 

@@ -31,8 +31,8 @@ if (dc == null) return [found: 0, note: "VisualProspecting has no ore veins reco
 def oreNames = { vt ->
     [vt.primaryOre, vt.secondaryOre, vt.inBetweenOre, vt.sporadicOre].findAll { it != null }.collect { m ->
         def n = []
-        try { n << m.getInternalName() } catch (ignored) { }
-        try { n << m.getLocalizedName() } catch (ignored) { }
+        try { n << m.getInternalName() } catch (Throwable ignored) { }
+        try { n << m.getLocalizedName() } catch (Throwable ignored) { }
         n
     }.flatten().findAll { it }
 }
@@ -47,7 +47,7 @@ for (v in dc.getAllOreVeins()) {
     if (!includeDepleted && v.isDepleted()) continue
     def names = oreNames(vt)
     String veinName = vt.name
-    try { veinName = vt.getVeinName() ?: vt.name } catch (ignored) { }
+    try { veinName = vt.getVeinName() ?: vt.name } catch (Throwable ignored) { }
     if (!(names + [vt.name, veinName]).any { it.toLowerCase().contains(want) }) continue
     double dx = v.getBlockX() - px, dz = v.getBlockZ() - pz
     int y = ((vt.minBlockY + vt.maxBlockY) / 2) as int

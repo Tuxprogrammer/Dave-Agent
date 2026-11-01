@@ -314,6 +314,38 @@ public final class SrgMetaClass extends DelegatingMetaClass {
         }
     }
 
+    /**
+     * The nearest class in {@code type}'s superclass chain whose members Java reflection can list.
+     * <p>
+     * On a dedicated server, client classes do not exist. A mod class that declares a client-only method without
+     * {@code @SideOnly} (say {@code registerIcons(IIconRegister)} on an Item) loads fine, but listing its methods
+     * throws {@code NoClassDefFoundError}, and Groovy lists them to build its metaclass, so every call on such an
+     * object would fail. Its superclass usually lists fine (vanilla's client-only methods are stripped), and calls
+     * through the superclass's methods still dispatch to the subclass's overrides. Only methods declared solely by the
+     * broken class are then out of reach.
+     */
+    static Class<?> reflectableAncestor(Class<?> type) {
+        // Groovy walks the whole superclass chain (fields, methods), so every class above the one used must list
+        // too: use the class just above the highest one that cannot.
+        Class<?> highestBad = null;
+        for (Class<?> c = type; c != null; c = c.getSuperclass()) {
+            try {
+                c.getDeclaredMethods();
+                c.getDeclaredFields();
+                c.getDeclaredConstructors();
+                c.getMethods();
+            } catch (LinkageError e) {
+                highestBad = c;
+                EvalLog.debug("Members of " + c.getName() + " cannot be listed on this side; using a superclass", e);
+            }
+        }
+        if (highestBad == null) {
+            return type;
+        }
+        Class<?> above = highestBad.getSuperclass();
+        return above != null ? above : Object.class;
+    }
+
     /** Wraps the metaclasses of Minecraft-hierarchy classes as Groovy creates them. */
     static final class Handle extends MetaClassRegistry.MetaClassCreationHandle {
 
@@ -325,7 +357,8 @@ public final class SrgMetaClass extends DelegatingMetaClass {
 
         @Override
         protected MetaClass createNormalMetaClass(Class theClass, MetaClassRegistry registry) {
-            MetaClass normal = super.createNormalMetaClass(theClass, registry);
+            Class<?> usable = theClass == null ? null : reflectableAncestor(theClass);
+            MetaClass normal = super.createNormalMetaClass(usable, registry);
             if (theClass != null && inMinecraftHierarchy(theClass)) {
                 return new SrgMetaClass(normal, names);
             }

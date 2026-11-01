@@ -50,7 +50,7 @@ public class EvalHelpers {
         boolean statics = target instanceof Class;
         List<Map<String, Object>> out = new ArrayList<>();
         for (Class<?> c = type; c != null && c != Object.class; c = c.getSuperclass()) {
-            for (Field f : c.getDeclaredFields()) {
+            for (Field f : declaredFields(c)) {
                 if (Modifier.isStatic(f.getModifiers()) != statics || f.isSynthetic()) {
                     continue;
                 }
@@ -80,7 +80,7 @@ public class EvalHelpers {
         String f = filter == null ? "" : filter.toLowerCase(Locale.ROOT);
         List<String> out = new ArrayList<>();
         for (Class<?> c = type; c != null && c != Object.class; c = c.getSuperclass()) {
-            for (Method m : c.getDeclaredMethods()) {
+            for (Method m : declaredMethods(c)) {
                 if (m.isSynthetic() || m.isBridge()) {
                     continue;
                 }
@@ -146,7 +146,7 @@ public class EvalHelpers {
         candidates.add(name);
         candidates.addAll(names.srgMethods(name));
         for (Class<?> c = type; c != null; c = c.getSuperclass()) {
-            for (Method m : c.getDeclaredMethods()) {
+            for (Method m : declaredMethods(c)) {
                 if (candidates.contains(m.getName()) && fits(m.getParameterTypes(), a)) {
                     m.setAccessible(true);
                     try {
@@ -164,6 +164,26 @@ public class EvalHelpers {
         throw new NoSuchMethodException(type.getName() + "." + name + " with " + a.length + " argument(s)");
     }
 
+    /**
+     * A class's declared fields, or none when this side cannot list them (a mod class declaring a client-only
+     * signature on a dedicated server throws NoClassDefFoundError here; see SrgMetaClass.reflectableAncestor).
+     */
+    private static Field[] declaredFields(Class<?> c) {
+        try {
+            return c.getDeclaredFields();
+        } catch (LinkageError e) {
+            return new Field[0];
+        }
+    }
+
+    private static Method[] declaredMethods(Class<?> c) {
+        try {
+            return c.getDeclaredMethods();
+        } catch (LinkageError e) {
+            return new Method[0];
+        }
+    }
+
     private Field findField(Class<?> type, String name) throws NoSuchFieldException {
         List<String> candidates = new ArrayList<>();
         candidates.add(name);
@@ -174,7 +194,7 @@ public class EvalHelpers {
                     Field f = c.getDeclaredField(n);
                     f.setAccessible(true);
                     return f;
-                } catch (NoSuchFieldException ignored) {
+                } catch (NoSuchFieldException | LinkageError ignored) {
                     // try the next name or superclass
                 }
             }

@@ -17,7 +17,7 @@ def owner = params.owner?.toString()?.toLowerCase()
 Integer onlyDim = params.dim != null ? (params.dim as int) : null
 int limit = Math.min(25, (params.limit ?: 5) as int)
 def pipeClass = null
-try { pipeClass = dave.cls('gregtech.api.metatileentity.MetaPipeEntity') } catch (ignored) { }
+try { pipeClass = dave.cls('gregtech.api.metatileentity.MetaPipeEntity') } catch (Throwable ignored) { }
 
 def hits = []
 for (w in dave.worlds()) {
@@ -30,16 +30,16 @@ for (w in dave.worlds()) {
         if (te.metaClass.respondsTo(te, 'getMetaTileEntity')) {
             mte = te.getMetaTileEntity()
             if (mte == null || (pipeClass != null && pipeClass.isInstance(mte))) continue
-            try { names << mte.getLocalName() } catch (ignored) { }
+            try { names << mte.getLocalName() } catch (Throwable ignored) { }
             names << mte.getMetaName()
             gtOwner = te.getOwnerName()
         } else {
-            names << te.getClass().getSimpleName()
             try {
                 def block = te.getBlockType()
                 def item = Item.getItemFromBlock(block)
-                if (item != null) names << new ItemStack(item, 1, te.getBlockMetadata()).getDisplayName()
-            } catch (ignored) { }
+                if (item != null) names << new ItemStack(item, 1, block.damageDropped(te.getBlockMetadata())).getDisplayName()
+            } catch (Throwable ignored) { }
+            names << te.getClass().getSimpleName()
         }
         if (!names.any { it != null && it.toLowerCase().contains(type) }) continue
         if (owner && (gtOwner == null || gtOwner.toLowerCase() != owner)) continue

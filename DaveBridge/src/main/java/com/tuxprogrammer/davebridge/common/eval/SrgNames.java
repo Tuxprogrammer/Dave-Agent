@@ -33,11 +33,29 @@ public final class SrgNames {
     private final Map<String, List<String>> mcpToSrg;
 
     SrgNames(Map<String, String> srgToMcp) {
+        this(srgToMcp, pairsOf(srgToMcp));
+    }
+
+    private static List<String[]> pairsOf(Map<String, String> map) {
+        List<String[]> pairs = new ArrayList<>();
+        for (Map.Entry<String, String> e : map.entrySet()) {
+            pairs.add(new String[] { e.getKey(), e.getValue() });
+        }
+        return pairs;
+    }
+
+    /**
+     * @param srgToMcp the name shown for each SRG name (the first one listed)
+     * @param pairs    every (srg, name) pair: an SRG name may have an older and a newer MCP name, and both work
+     */
+    SrgNames(Map<String, String> srgToMcp, List<String[]> pairs) {
         this.srgToMcp = srgToMcp;
         Map<String, List<String>> reverse = new HashMap<>();
-        for (Map.Entry<String, String> e : srgToMcp.entrySet()) {
-            reverse.computeIfAbsent(e.getValue(), k -> new ArrayList<>(1))
-                .add(e.getKey());
+        for (String[] p : pairs) {
+            List<String> list = reverse.computeIfAbsent(p[1], k -> new ArrayList<>(1));
+            if (!list.contains(p[0])) {
+                list.add(p[0]);
+            }
         }
         for (Map.Entry<String, List<String>> e : reverse.entrySet()) {
             Collections.sort(e.getValue());
@@ -74,9 +92,13 @@ public final class SrgNames {
         }
     }
 
-    /** Parses {@code srg<TAB>mcp} lines; {@code #} starts a comment line. */
+    /**
+     * Parses {@code srg<TAB>name} lines; {@code #} starts a comment line. An SRG name may appear more than once (an
+     * older and a newer MCP name); the first is the one {@link #mcp} shows, all of them translate.
+     */
     public static SrgNames parse(Reader reader) throws IOException {
         Map<String, String> map = new HashMap<>();
+        List<String[]> pairs = new ArrayList<>();
         BufferedReader br = new BufferedReader(reader);
         String line;
         while ((line = br.readLine()) != null) {
@@ -87,9 +109,12 @@ public final class SrgNames {
             if (tab <= 0 || tab == line.length() - 1) {
                 continue;
             }
-            map.put(line.substring(0, tab), line.substring(tab + 1));
+            String srg = line.substring(0, tab);
+            String name = line.substring(tab + 1);
+            map.putIfAbsent(srg, name);
+            pairs.add(new String[] { srg, name });
         }
-        return new SrgNames(map);
+        return new SrgNames(map, pairs);
     }
 
     /** True for names that look like SRG member names ({@code field_123_a}, {@code func_123_a}). */
