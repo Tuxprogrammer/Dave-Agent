@@ -1,5 +1,6 @@
 package com.tuxprogrammer.davebridge.server.lesson;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -150,8 +151,12 @@ public final class LessonService {
         if (target == null || target.isEmpty() || "@a".equals(target)) {
             throw new ProtocolException(Protocol.ERR_BAD_REQUEST, "'player' must name one player");
         }
-        EntityPlayerMP player = DaveChat.resolveTargets(target)
-            .get(0);
+        // resolveTargets returns nobody for an absent player (a say only warns); a lesson needs a player
+        List<EntityPlayerMP> found = DaveChat.resolveTargets(target);
+        if (found.isEmpty()) {
+            throw new ProtocolException(Protocol.ERR_NOT_FOUND, "player " + target + " is not online");
+        }
+        EntityPlayerMP player = found.get(0);
         if (!canPlayLessons(DaveServer.CLIENTS.get(player.getUniqueID()))) {
             throw new ProtocolException(
                 ERR_NO_CLIENT_MOD,

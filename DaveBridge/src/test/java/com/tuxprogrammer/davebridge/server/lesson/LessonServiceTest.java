@@ -3,6 +3,7 @@ package com.tuxprogrammer.davebridge.server.lesson;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
@@ -13,8 +14,21 @@ import com.google.gson.JsonObject;
 import com.tuxprogrammer.davebridge.common.protocol.DavePackets;
 import com.tuxprogrammer.davebridge.common.protocol.LessonStatus;
 import com.tuxprogrammer.davebridge.server.ClientModTracker;
+import com.tuxprogrammer.davebridge.server.bridge.Protocol;
+import com.tuxprogrammer.davebridge.server.bridge.ProtocolException;
 
 class LessonServiceTest {
+
+    @Test
+    void anAbsentPlayerIsNotFound() {
+        // No server in unit tests, so nobody is online. DaveChat.resolveTargets returns nobody for an absent name
+        // (a say only warns); a lesson must answer not_found, not fail with an internal error.
+        ProtocolException e = assertThrows(ProtocolException.class, () -> LessonService.lessonPlayer("Nobody"));
+        assertEquals(Protocol.ERR_NOT_FOUND, e.code());
+        assertEquals(
+            Protocol.ERR_BAD_REQUEST,
+            assertThrows(ProtocolException.class, () -> LessonService.lessonPlayer("@a")).code());
+    }
 
     @Test
     void lessonsNeedTheCapabilityAndOurProtocol() {
