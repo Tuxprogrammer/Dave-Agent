@@ -1,6 +1,6 @@
 # Plan: recipe knowledge and chain planning for Dave
 
-Status: planned (2026-10-31). Target: our own GTNH 2.9.0 pack. Expect our custom mods (GregGuns, then TrainHorizons) to add recipes, so every stage below has to be re-runnable from the pack, never hand-patched.
+Status: Stages 1, 2 and 4 live (2026-11-01): the export, `data/recipes.sqlite`, and the `recipes` MCP server with `recipe_producers`, `recipe_uses`, `recipe_get`, `item_find` and `plan_chain` (`tools/recipe-export/`, `tools/recipes/`). Stage 3 (search) is live separately; Stage 5's item-cost pass and plan JSON export are not done. Planned 2026-10-31. Target: our own GTNH 2.9.0 pack. Expect our custom mods (GregGuns, then TrainHorizons) to add recipes, so every stage below has to be re-runnable from the pack, never hand-patched.
 
 ## The question this answers
 
@@ -48,17 +48,19 @@ Dave's usual sequence:
 - JamesArhy/gtnh-recipe-extractor: Parquet output, but 2.9 is untested.
 - GregTech's own `RecipeChangeAudit.dump()`: no tool calls it. Through DaveBridge's eval it's a cheap **cross-check** on the live server.
 
-**To verify before relying on it:**
-- [ ] Cleanroom, low gravity, coil heat and fusion start EU are read from the recipe **metadata**, not the old special-value codes.
-- [ ] Programmed circuits are kept, and chanced outputs keep their chances.
-- [ ] The full export runs against a 2.9.0 **server** instance. Their pipeline mostly ran it in a client.
+**To verify before relying on it** (checked 2026-11-01 on our 2.9.0 server pack):
+- [x] Cleanroom, low gravity, coil heat and fusion start EU are read from the recipe **metadata**, not the old special-value codes. Upstream only exported `mSpecialValue` (plus fusion start from `FUSION_THRESHOLD` metadata), so our copy of the oracle adds each recipe's whole metadata map ("Dave patch" in `GtnhCalcOracleExporter.java`), and `build_db.py` reads metadata first. Findings over 187,803 GT recipes: `coil_heat` is set on 4,166 and equals `mSpecialValue` on all of them; 18 EBF recipes carry heat only in `mSpecialValue` (kept as the fallback); `cleanroom` is set on 2,044 and **one** EBF recipe (3,200 K) has it only in the metadata, because GT derives the special value from metadata only when none was set explicitly; `low_gravity` (7) always matches; `fusion_threshold` on all 68 fusion recipes.
+- [x] Programmed circuits are kept (zero-size stacks exported as not consumed; 34,155 circuit slots), and chanced outputs keep their chances (32,151). Input chances survive too (2).
+- [x] The full export runs against a 2.9.0 **server** instance, headless, with `-Dgtnh.oracle.autorun=true`: 261,217 raw recipes, 328 MB JSON, about 80-100 s of server time (Java 25 on the laptop; Java 21 on test-host, which `run.sh` can use through `RECIPE_EXPORT_HOST`). Two exports (Java 25 and Java 21) gave the same recipe hashes except 22 of 252,736 (19 CropsNH crop-breeder entries with rolled values, 2 infusion, 1 assembly line). What a server **cannot** export: Thaumcraft arcane crafting grids (they come from NEI on a client; those 621 recipes keep only output and vis and are flagged `incomplete`), essentia smelting (a client-only creative-tab call; partial) and CropsNH crop cards (client classes). 215 crafting recipes of IRecipe classes the exporter cannot read have no inputs and are flagged `incomplete` too. Neither kind is ever planned.
+
+**What `run.sh` puts in the server:** stock 2.9.0 + GregGuns, Fortunate One and WorldEdit from `tuxmine/server/`. DaveBridge, DiscordIntegration and JourneyMap Unlimited are left out (no recipes; DaveBridge opens a WebSocket listener and DiscordIntegration logs in to Discord); `RECIPE_EXPORT_SKIP` changes that. GregGuns' recipes arrive both through its GT maps (`gregguns.ammoPress`) and the crafting table.
 
 **Running it:**
 1. Make a throwaway copy of our server pack under `.work/`. Never use the production container.
 2. Add the oracle jar and accept the EULA.
 3. Start with autorun on, then collect `GTNH-Calc-Oracle/gtnh-oracle-*.json`.
 
-This becomes `tools/recipe-export/run.sh <pack-dir>`, run on every pack change.
+This is `tools/recipe-export/run.sh <pack-dir>` (pack-dir = the extracted stock server zip, e.g. `.work/gtnh-2.9.0/pack`), run on every pack change. It ends by building the database.
 
 **Recipe IDs change between exports.** Key everything Dave saves on a content hash (map, inputs, outputs, EU/t, ticks), never on the exporter's ID. Their `carry-recipe-ids.mjs` shows the approach.
 
@@ -77,7 +79,7 @@ Normalize the oracle JSON into `data/recipes.sqlite`:
 
 FTS5 full-text search over item names is a cheap exact-name fallback alongside the embeddings.
 
-Their `normalize-oracle-export.mjs` (MIT) already has many hard-won rules: machine families, oredict alternatives, cells vs fluids. **Read it and port its rules; don't rediscover them.**
+Their `normalize-oracle-export.mjs` (MIT) already has many hard-won rules: machine families, oredict alternatives, cells vs fluids. **Read it and port its rules; don't rediscover them.** Ported in `build_db.py` (its docstring lists them). Not ported: NEI layouts, icons, the synthesized "Tank" recipes, Sparge rolled byproducts, bees, crops, mob drops and ore veins (the export has them; `pack_meta.not_normalized` lists them). As built: 252,736 recipes, 893,977 io rows, 67,180 items, 181 maps, 154 MB, about 15 s and 1.6 GB peak memory. `recipes` also has `recycle` (GT's recycling flag), `fake` and `hidden`; `items` has `producers` and `uses` counts.
 
 ## Stage 3: Semantic search (`gtnh_search`)
 
@@ -185,11 +187,13 @@ The objective is **lexicographic**, in the style of OrderedSet86/flow2. Each sta
 3. Machine count.
 4. Total flow.
 
+**As built** (`tools/recipes/planner.py`): stage 1 is EU per item **plus raw resources at an EU-equivalent price by class** (free 0, cheap 2,000, costly 100,000 per item or 1,000 L; anything unexpanded or unavailable at the player's tier 10,000,000). Pure machine EU made every ore-electrolysis byproduct route "best" for nitrogen, because mining costs no EU. Stages 2-4 follow as above. Recipes with 0 EU and no consumed input are never planned (the Eye of Harmony, algae pond and tree growth simulator recipes yield from nothing as data, and won every plan), nor are recycling, display-only (except the assembly line, rock breaker and tree farm maps) and incomplete recipes. Crafting tools are not consumed. Machine counts are at base speed. Golden tests: HV nitrogen = Multiblock Centrifuge on free air, 11,200 EU per 3,900 L = 2,871.8 EU per 1,000 L; the Vacuum Freezer route = air -> liquid air (VF) -> centrifuge, 17,993.5 EU per 1,000 L; EBF steel honours coil heat. Known gaps: ore commonness is not modelled (every ore is "cheap"), slot alternatives are not substituted, and 0-EU primitive machines (Bricked Blast Furnace, Coke Oven) win "least EU" for steel unless the player locks the EBF.
+
 **3. Steering:**
 
 | Player says | Becomes |
 |---|---|
-| Lock a recipe | `rate ≥ ε` (or a fixed rate) |
+| Lock a recipe | `rate ≥ ε` (or a fixed rate). As built: a lock (recipe `#hash` or machine) holds in the strongest feasible form: the locked step makes the target and nothing else does; else the target is made 1-3 steps downstream from what it makes (a flow constraint per link; empty cells and buckets are not links); else it only has to run. The plan says which |
 | "I have plenty of X" | X's import is free |
 | "No X" | X's import is 0 |
 | "Don't use machine Y" | Drop those recipes |

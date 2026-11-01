@@ -12,6 +12,7 @@
       "mcp__dave-memory",
       "mcp__gtnh-search",
       "mcp__living-wiki",
+      "mcp__recipes",
       "Agent(recipe-planner)", "Task(recipe-planner)"
     ],
     "deny": [

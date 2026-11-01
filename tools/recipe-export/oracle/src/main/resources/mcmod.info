@@ -1,0 +1,11 @@
+[
+  {
+    "modid": "${modId}",
+    "name": "${modName}",
+    "description": "Exports GTNH runtime calculation data for GTNH Factory Flow.",
+    "version": "${modVersion}",
+    "mcversion": "${minecraftVersion}",
+    "authorList": ["GTNH Factory Flow"],
+    "dependencies": []
+  }
+]

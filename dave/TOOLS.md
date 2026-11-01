@@ -34,7 +34,7 @@ checked result (ANSWER / CHAIN / TOTALS / RUNNER-UP / ...) that Dave turns into 
 
 | Field | Value |
 |---|---|
-| `tools` | Read, Grep, Glob, `gtnh_search`, `memory_recall`, `memory_get`, `player_get` (memory read-only), and the planned `recipes` tools (`recipe_producers`, `recipe_uses`, `recipe_get`, `item_find`, `plan_chain`). Tools of MCP servers that aren't registered yet are dropped at render time |
+| `tools` | Read, Grep, Glob, `gtnh_search`, `memory_recall`, `memory_get`, `player_get` (memory read-only), and the `recipes` tools (`recipe_producers`, `recipe_uses`, `recipe_get`, `item_find`, `plan_chain`). Tools of MCP servers that aren't registered are dropped at render time |
 | `maxTurns` | 40 |
 | `omitClaudeMd` | true (on top of the global CLAUDE.md shutdown) |
 
@@ -113,19 +113,26 @@ Rule for Dave (in SOUL): the wiki says what is true now. Pages are written as cu
 with no "used to" or "(corrected by Dave)". The old claim and why it changed go in `reason` and `evidence`, and
 every edit needs evidence. Allowed in `launch/settings.json`; `recipe-planner` gets read-only `wiki_get`.
 
-## MCP: `recipes` (planned; owner: recipe-knowledge work, `docs/plans/recipe-knowledge.md`)
+## MCP: `recipes` (live; `tools/recipes/`, plan in `docs/plans/recipe-knowledge.md`)
 
-One Python server under `tools/` over `data/recipes.sqlite`, exported from our own pack.
+`tools/recipes/server.py` over `data/recipes.sqlite`, exported from **our own pack** (stock 2.9.0 plus the
+`tuxmine/server` mods, GregGuns included) by `tools/recipe-export/run.sh` and built by `tools/recipes/build_db.py`.
+The database path is `[paths] recipes` / `DAVE_RECIPES_DB` (production: the read-only copy baked into the image,
+e.g. `/dave/ro/recipes.sqlite`); a rebuilt file is picked up between calls. Standard library only, except
+`plan_chain`, which needs `highspy` (`tools/recipes/requirements.txt`; the image pip-installs it). Without it the
+other four tools still work and `plan_chain` says what is missing. In dev, run `dave_cmd.py` with a Python that has
+highspy (the MCP servers use `sys.executable`).
 
 | Tool | Does |
 |---|---|
-| `recipe_producers(item, tier?, ...)` | Recipes that make an item, with EU/t, duration, tier, cleanroom, coil heat, circuit |
-| `recipe_uses(item, ...)` | Recipes that consume an item |
-| `recipe_get(id_or_hash)` | One recipe in full (content-hash keyed) |
-| `item_find(name)` | FTS exact-name fallback alongside search |
-| `plan_chain(target, rate?, tier, locks?, free?, banned?)` | LP optimum (HiGHS, lexicographic: EU, raw cost, machines, flow), with the runner-up and why it lost |
+| `recipe_producers(item, tier?, heat?, cleanroom?, machine?, limit, offset)` | Recipes that make an item or fluid: machine, tier, EU/t, seconds, total EU, circuit, cleanroom, coil heat, every input and output with amounts, chances and slot alternatives. Real production first, recycling last |
+| `recipe_uses(item, ...)` | Recipes that consume or need it, same format |
+| `recipe_get(id)` | One recipe by its `#hash` (a content hash, stable across exports of the same pack), with its raw GT metadata and the machines that run its map |
+| `item_find(name, k, kind?)` | FTS5 name search: ids, kinds, mods, ore dictionary names, producer and use counts |
+| `plan_chain(target, rate?, tier, heat?, cleanroom?, lowgrav?, locks?, free?, banned?, max_depth?, runner_up?)` | LP optimum (HiGHS, lexicographic: EU per item with raw resources priced by class, raw cost, machines, flow): chosen recipes with runs/s and machine counts, EU/t, EU per item, imports, byproducts, the runner-up and why it lost |
 
-To add it: add an entry to `launch/mcp.json` and an `mcp__recipes` allow rule to `launch/settings.json`.
+Item ids: `<mod>:<name>[@meta]` (lowercase, meta 0 omitted), `fluid:<name>`, `aspect:<tag>`, `ore:<oredict>`.
+Allowed with `mcp__recipes`; `recipe-planner` gets all five.
 
 ## MCP: `bridge` (planned; owner: the daemon, M2/M3)
 
