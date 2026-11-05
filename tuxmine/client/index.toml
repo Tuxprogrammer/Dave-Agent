@@ -46,6 +46,11 @@ hash = "9475c3746fc2b431de120d09d9fb03304467cba498035773d5e5b1efc56a65e7"
 metafile = true
 
 [[files]]
+file = "mods/lostcitiesnh.pw.toml"
+hash = "d8e02ac5c21b392485d16477652b79698036206d1f724672f4747bcb8918f61d"
+metafile = true
+
+[[files]]
 file = "mods/qz-miner.pw.toml"
 hash = "c61b9b84c63df38a7751e39b337df5cb4322fb19bbd810e19d43c512e74817bc"
 metafile = true
