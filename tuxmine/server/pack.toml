@@ -1,6 +1,6 @@
 name = "tuxmine-server"
 author = "Spencer Callicott"
-version = "0.1.17"
+version = "0.1.20"
 pack-format = "packwiz:1.1.0"
 
 [index]
