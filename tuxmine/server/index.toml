@@ -5,6 +5,18 @@ file = "config/fortunateone.cfg"
 hash = "e6676f0d6fdc36d39f7c5bca1847457882628f95ee960f7e2c0105d4d535b84f"
 
 [[files]]
+file = "config/gtnhrates.cfg"
+hash = "dffcbe0dc60bf48c0de6b94864f106b16790a1fcef1b6edebede8abed0fc8653"
+
+[[files]]
+file = "config/qz_miner.yaml"
+hash = "1ba5e751ae7ab24767fe0bcdab31b2276bb28c96a6db1c0f33d8eb5b763c164d"
+
+[[files]]
+file = "config/worldedit/worldedit.properties"
+hash = "b4f2abaf400e0bf4ca8000da16227cc3289bab684b2d14d7b0976465152c4122"
+
+[[files]]
 file = "mods/davebridge-0.2.6.jar"
 hash = "a0c683348599454648800e67343eba70316670a655882667f98eee280ddaa6ab"
 
@@ -41,18 +53,6 @@ metafile = true
 file = "mods/qz-miner.pw.toml"
 hash = "c61b9b84c63df38a7751e39b337df5cb4322fb19bbd810e19d43c512e74817bc"
 metafile = true
-
-[[files]]
-file = "mods/qz_uilib-5.0.0-beta5.jar"
-hash = "a3be2bdc69716d6e0ab4b0b836e7accf0dd4f80939acdcca8fa536da0c9d6a87"
-
-[[files]]
-file = "mods/qz_uilib-core-java8-5.0.0-beta5.jar"
-hash = "37ee9505f5943f32fd5ad543069628cead12d6724beb956336c4a39434c58c54"
-
-[[files]]
-file = "mods/qz_uilib-font-adapter-java8-5.0.0-beta5.jar"
-hash = "62c66cfd37768b1d9dbf80651ec61880221d2d76cad2fb9e2e3a411575aaf357"
 
 [[files]]
 file = "mods/worldedit.pw.toml"
