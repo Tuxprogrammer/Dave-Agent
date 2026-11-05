@@ -46,6 +46,11 @@ hash = "c61b9b84c63df38a7751e39b337df5cb4322fb19bbd810e19d43c512e74817bc"
 metafile = true
 
 [[files]]
+file = "mods/qz-uilib-compat.pw.toml"
+hash = "303c06ede147abca2d1e396a6026bf54938cafa84083f9bddc3e082e29755b27"
+metafile = true
+
+[[files]]
 file = "mods/qz_uilib-5.0.0-beta5.jar"
 hash = "a3be2bdc69716d6e0ab4b0b836e7accf0dd4f80939acdcca8fa536da0c9d6a87"
 
