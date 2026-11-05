@@ -55,6 +55,18 @@ hash = "c61b9b84c63df38a7751e39b337df5cb4322fb19bbd810e19d43c512e74817bc"
 metafile = true
 
 [[files]]
+file = "mods/qz_uilib-5.0.0-beta5.jar"
+hash = "a3be2bdc69716d6e0ab4b0b836e7accf0dd4f80939acdcca8fa536da0c9d6a87"
+
+[[files]]
+file = "mods/qz_uilib-core-java8-5.0.0-beta5.jar"
+hash = "37ee9505f5943f32fd5ad543069628cead12d6724beb956336c4a39434c58c54"
+
+[[files]]
+file = "mods/qz_uilib-font-adapter-java8-5.0.0-beta5.jar"
+hash = "62c66cfd37768b1d9dbf80651ec61880221d2d76cad2fb9e2e3a411575aaf357"
+
+[[files]]
 file = "mods/worldedit.pw.toml"
 hash = "3499908f4643ed1551b16ea388afce382c2f53ade1c93e4f9d9cbc5b79e91641"
 metafile = true
