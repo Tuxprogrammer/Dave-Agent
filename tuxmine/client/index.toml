@@ -28,7 +28,7 @@ metafile = true
 
 [[files]]
 file = "mods/fortunateone.pw.toml"
-hash = "278262db2cc938ffbe15dc2677d72c14f8a15d45214f05ef57e5b791397a5a69"
+hash = "b0fa23e1398942cd604b7651745ca04da05c05f403948b8e44fee49efa9263d1"
 metafile = true
 
 [[files]]
