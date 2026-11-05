@@ -9,6 +9,11 @@ file = "config/fortunateone.cfg"
 hash = "e6676f0d6fdc36d39f7c5bca1847457882628f95ee960f7e2c0105d4d535b84f"
 
 [[files]]
+file = "config/qz_uilib.yaml"
+hash = "a287f7d87b29d76f14d18a1626a332b98e14b2c4341dc68d928aa6892a9b6df0"
+preserve = true
+
+[[files]]
 file = "mods/WorldEditCuiFe-v1.0.7-mf-1.7.10-10.13.4.1566.jar"
 hash = "fafc2dc319b50018e63712cfd087f1f32c112443e37dbdc1c09bf84bd2bc514a"
 
