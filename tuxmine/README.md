@@ -6,8 +6,8 @@ There are **two separate packs**, because clients and the server need different 
 
 | Pack | Folder | Used by | Contents |
 |---|---|---|---|
-| `tuxmine-client` | `client/` | Every player's Prism instance, via a pre-launch command | Our mods (DaveBridge, GregGuns, Fortunate One), WorldEdit + WorldEdit CUI, JourneyMap Unlimited (in place of GTNH's fairplay build), shared config (`findit.cfg`, `fortunateone.cfg`) |
-| `tuxmine-server` | `server/` | The GTNH server container, via itzg's `PACKWIZ_URL` | Our mods (DaveBridge, GregGuns, Fortunate One), WorldEdit, server-only mods (DiscordIntegration, the JourneyMap "unlimited" server build), config GTNH doesn't ship (`fortunateone.cfg`) |
+| `tuxmine-client` | `client/` | Every player's Prism instance, via a pre-launch command | Our mods (DaveBridge, GregGuns, Fortunate One), EZStorage, GTNHRates, Qz-Miner + Qz-UILib (3 jars), WorldEdit + WorldEdit CUI, JourneyMap Unlimited (in place of GTNH's fairplay build), shared config (`findit.cfg`, `fortunateone.cfg`) |
+| `tuxmine-server` | `server/` | The GTNH server container, via itzg's `PACKWIZ_URL` | Our mods (DaveBridge, GregGuns, Fortunate One), EZStorage, GTNHRates, Qz-Miner + Qz-UILib (3 jars), WorldEdit, server-only mods (DiscordIntegration, the JourneyMap "unlimited" server build), config GTNH doesn't ship (`fortunateone.cfg`) |
 
 Both sit on top of stock GTNH. Players and the server still get the GTNH pack itself the normal way; the packs only add our files.
 

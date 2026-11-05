@@ -1,0 +1,8 @@
+name = "ezstorage"
+filename = "ezstorage-1.8.2.jar"
+side = "both"
+
+[download]
+url = "https://github.com/LITW-Refined/EZStorage/releases/download/1.8.2/ezstorage-1.8.2.jar"
+hash-format = "sha256"
+hash = "45f4cf15254ad090f6e2c409d02cb69c06d1823ae48bc89007c3b6c4ca1836b5"

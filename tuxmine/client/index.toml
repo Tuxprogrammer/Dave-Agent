@@ -17,18 +17,45 @@ file = "mods/davebridge-0.2.6.jar"
 hash = "a0c683348599454648800e67343eba70316670a655882667f98eee280ddaa6ab"
 
 [[files]]
+file = "mods/ezstorage.pw.toml"
+hash = "74ddcede67388ff11215cfa7f807ac218a8a9bb5d486dd0c1eca4540a97270b0"
+metafile = true
+
+[[files]]
 file = "mods/fortunateone.pw.toml"
 hash = "278262db2cc938ffbe15dc2677d72c14f8a15d45214f05ef57e5b791397a5a69"
 metafile = true
 
 [[files]]
-file = "mods/gregguns-e49c0b0.jar"
-hash = "2d70d7fef9bd62321a4ec84d05c6655b19b01b1919ad35d58026d4d1666ca06a"
+file = "mods/gregguns-aa9c8aa.jar"
+hash = "1ae33f65ce71305ec711fb3c9bbe6665034046165fa19d281b3486154e29ed8e"
+
+[[files]]
+file = "mods/gtnhrates.pw.toml"
+hash = "9a068c75d12f5232d0c574c2c1bc04a7647c5d18f40724cbb9630fed5d630286"
+metafile = true
 
 [[files]]
 file = "mods/journeymap-unlimited.pw.toml"
 hash = "9475c3746fc2b431de120d09d9fb03304467cba498035773d5e5b1efc56a65e7"
 metafile = true
+
+[[files]]
+file = "mods/qz-miner.pw.toml"
+hash = "c61b9b84c63df38a7751e39b337df5cb4322fb19bbd810e19d43c512e74817bc"
+metafile = true
+
+[[files]]
+file = "mods/qz_uilib-5.0.0-beta5.jar"
+hash = "a3be2bdc69716d6e0ab4b0b836e7accf0dd4f80939acdcca8fa536da0c9d6a87"
+
+[[files]]
+file = "mods/qz_uilib-core-java8-5.0.0-beta5.jar"
+hash = "37ee9505f5943f32fd5ad543069628cead12d6724beb956336c4a39434c58c54"
+
+[[files]]
+file = "mods/qz_uilib-font-adapter-java8-5.0.0-beta5.jar"
+hash = "62c66cfd37768b1d9dbf80651ec61880221d2d76cad2fb9e2e3a411575aaf357"
 
 [[files]]
 file = "mods/worldedit.pw.toml"
