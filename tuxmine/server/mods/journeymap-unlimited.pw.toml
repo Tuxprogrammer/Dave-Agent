@@ -1,8 +1,0 @@
-name = "JourneyMap Unlimited"
-filename = "journeymap-1.7.10-5.2.23-unlimited.jar"
-side = "server"
-
-[download]
-url = "https://cdn.modrinth.com/data/lfHFW1mp/versions/pQmw6aS6/journeymap-1.7.10-5.2.23-unlimited.jar"
-hash-format = "sha256"
-hash = "7d964278447412f9fc644c2b3f91e9fab73444aa9247b9b2cf31444cf6ca4646"

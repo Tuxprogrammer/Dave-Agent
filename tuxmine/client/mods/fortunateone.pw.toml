@@ -1,8 +1,0 @@
-name = "Fortunate One"
-filename = "fortunateone-v1.1.11.jar"
-side = "client"
-
-[download]
-url = "https://github.com/Tuxprogrammer/Fortunate-One/releases/download/v1.1.11/fortunateone-v1.1.11.jar"
-hash-format = "sha256"
-hash = "b799aa2d8e95dd5e407ef1eb65008fb0a6235417526c0267ca433c40b459749e"

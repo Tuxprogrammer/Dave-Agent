@@ -1,8 +1,0 @@
-name = "qz-uilib-compat"
-filename = "qz_uilib_compat-1.0.0-beta3.jar"
-side = "client"
-
-[download]
-url = "https://github.com/QuanhuZeYu/Qz-UILib-Compat/releases/download/1.0.0-beta3/qz_uilib_compat-1.0.0-beta3.jar"
-hash-format = "sha256"
-hash = "96e027630cb903f5906800eb9ecd0eb256b95bd01db81234c4507d806f682644"

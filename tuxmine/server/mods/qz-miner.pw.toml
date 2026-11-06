@@ -1,8 +1,0 @@
-name = "qz-miner"
-filename = "qz_miner-5.5.1.jar"
-side = "both"
-
-[download]
-url = "https://github.com/QuanhuZeYu/Qz-Miner/releases/download/5.5.1/qz_miner-5.5.1.jar"
-hash-format = "sha256"
-hash = "71b9b5e680e42cfdc5e642034985c06ab2ff844b65f9854465302343e47066e2"

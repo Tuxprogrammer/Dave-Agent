@@ -25,12 +25,9 @@ data/recipes.sqlite.tmp
 # Downloads, extracted packs, trial state (large, regenerable)
 .work/
 
-# tuxmine pack distribution: build output lives in .work/tuxmine/. Guard against strays in the
-# packs (packwiz-installer state, instance zips) and any local secrets file next to deploy files.
-tuxmine/**/packwiz.json
-tuxmine/**/packwiz-installer*.jar
-tuxmine/**/*.zip
-tuxmine/deploy/secrets/
+# tuxmine/ (packs, deploy files, seed browser) is local-only: it names the real hosts. Untracked on
+# purpose; build output lives in .work/tuxmine/.
+/tuxmine/
 
 # Generated source tree (1.7 GB, partly closed-source decompiles): regenerate with tools/decomp/. Only the
 # indexes are versioned.

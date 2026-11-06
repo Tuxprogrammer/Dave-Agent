@@ -1,8 +1,0 @@
-name = "lostcitiesnh"
-filename = "lostcitiesnh-0.1.0-beta.jar"
-side = "both"
-
-[download]
-url = "https://github.com/Tuxprogrammer/LostCities/releases/download/0.1.0-beta/lostcitiesnh-0.1.0-beta.jar"
-hash-format = "sha256"
-hash = "afce025adef62755fb9244a039dcc10f799e4a9848f2febb62733e7763d14383"
