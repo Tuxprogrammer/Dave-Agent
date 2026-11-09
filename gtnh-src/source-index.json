@@ -7180,14 +7180,14 @@
   ],
   "name": "GregGuns",
   "manifestName": null,
-  "jar": "gregguns-0.4.0-beta.jar",
-  "packVersion": "0.4.0-beta",
+  "jar": "gregguns-0.4.1-beta.jar",
+  "packVersion": "0.4.1-beta",
   "side": "BOTH",
   "repoUrl": "https://github.com/Tuxprogrammer/GregGuns",
-  "ref": "0.4.0-beta",
+  "ref": "0.4.1-beta",
   "refKind": "tag",
-  "commit": "282b324496f5fcc11ce7dae40ee70add1298ee7a",
-  "commitDate": "2026-11-07",
+  "commit": "3644f8e1f6e433b4e79a2d9398cce182b5ac775d",
+  "commitDate": "2026-11-09",
   "match": "exact",
   "sourceKind": "original",
   "license": "MIT",
@@ -7202,8 +7202,8 @@
   "searched": [],
   "tuxmineExtra": true,
   "tuxmine": {
-   "jar": "gregguns-0.4.0-beta.jar",
-   "sha256": "3098dabf07c7c37b701b175a5a9f4eaac2d46ae770de25ee10625811db33ebac",
+   "jar": "gregguns-0.4.1-beta.jar",
+   "sha256": "66d31ddcdecb283bac016b867543881b31ca723c427f848eed17058346262b47",
    "packs": [
     "server",
     "client"
@@ -7211,7 +7211,7 @@
    "download": null,
    "resourcesPath": "gtnh-src/mods/gregguns/",
    "ours": true,
-   "jarClassCoverage": "1589/1589",
+   "jarClassCoverage": "1624/1624",
    "generatedClasses": [
     "com.gregguns.Tags"
    ],

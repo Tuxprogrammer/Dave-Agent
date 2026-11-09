@@ -288,7 +288,7 @@ Jars our tuxmine packs add on top of the GTNH pack. The source is in `gtnh-src/s
 | DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar | server | discordintegration | DiscordIntegration (unofficial 1.7.10 build) | 3.1.1_3.8.3_464 | decompiled (chikachi.discord) | mods/DiscordIntegrationUnoffical/ | 61 | source/DiscordIntegration/ |
 | ezstorage-1.8.2.jar | server+client | ezstorage | Simple Storage | 1.8.2 | resources-only | mods/ezstorage/ | 0 | source/EZStorage/ |
 | fortunateone-v1.1.11.jar | server+client | fortunateone | Fortunate One | v1.1.11 | resources-only | mods/fortunateone/ | 0 | source/Fortunate-One/ |
-| gregguns-0.4.0-beta.jar | server+client | gregguns | GregGuns | 0.4.0-beta | resources-only | mods/gregguns/ | 0 | source/GregGuns/ |
+| gregguns-0.4.1-beta.jar | server+client | gregguns | GregGuns | 0.4.1-beta | resources-only | mods/gregguns/ | 0 | source/GregGuns/ |
 | gtnhrates-1.12.0-2.9.jar | server+client | gtnhrates | GTNH Rates | 1.12.0-2.9 | resources-only | mods/gtnhrates/ | 0 | source/GTNHRates/ |
 | journeymap-1.7.10-5.2.23-unlimited.jar | server+client | journeymap | JourneyMap | 5.2.23 | resources-only | mods/journeymap/ | 0 | source/journeymap-legacy/ |
 | lostcitiesnh-0.4.1-beta.jar | server+client | lostcitiesnh | Lost Cities: New Horizons | 0.4.1-beta | resources-only | mods/lostcitiesnh/ | 0 | source/LostCities/ |

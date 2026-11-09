@@ -4942,7 +4942,7 @@ ExtraUtilities:destructionpickaxe	0	Destruction Pickaxe
 ExtraUtilities:divisionSigil	0	Pseudo-Inversion Sigil
 ExtraUtilities:drum	0	Drum
 ExtraUtilities:drum	1	Bedrockium Drum
-ExtraUtilities:endConstructor	0	QED (Quantum Entity Device)
+ExtraUtilities:endConstructor	0	QED (Quantum Ender Diviner)
 ExtraUtilities:endConstructor	2	Ender-Flux Crystal
 ExtraUtilities:enderCollector	0	Ender Collector
 ExtraUtilities:enderQuarryUpgrade	0	Ender Quarry Upgrade Base
@@ -22598,7 +22598,7 @@ cropsnh:environmentalModule	28	Environmental Module (Beach)
 cropsnh:fertilizer	0	Fertilizer
 cropsnh:fertilizerCell	0	Fertilizer Cell
 cropsnh:gaiaWart	0	Gaia Wart
-cropsnh:genericSeed	0	Goldfish Seeds
+cropsnh:genericSeed	0	Pink Tulip Seeds
 cropsnh:goldfish	0	Goldfish
 cropsnh:hempHurd	0	Chipped Hemp Hurds
 cropsnh:materialLeaf	0	Bauxia Leaf
@@ -23031,8 +23031,8 @@ dreamcraft:OriginFramePart	0	Stargate Frame Part of Split Origin
 dreamcraft:OriginGatePlate	0	Stargate Plate of Split Origin
 dreamcraft:OriginNanoCircuit	0	Nano Circuit of Split Origin
 dreamcraft:OsmiumBars	0	Osmium Bars
-dreamcraft:OvenGlove	0	Pizza Glove (Left hand)
-dreamcraft:OvenGlove	1	Pizza Glove (Right hand)
+dreamcraft:OvenGlove	0	Cake Glove (Left hand)
+dreamcraft:OvenGlove	1	Cake Glove (Right hand)
 dreamcraft:PhobosStoneDust	0	Phobos Stone Dust
 dreamcraft:PicoWafer	0	Pico Wafer
 dreamcraft:PikoCircuit	0	Pico Circuit
