@@ -1,6 +1,6 @@
 # Plan: recipe knowledge and chain planning for Dave
 
-Status: Stages 1, 2 and 4 live (2026-11-01): the export, `data/recipes.sqlite`, and the `recipes` MCP server with `recipe_producers`, `recipe_uses`, `recipe_get`, `item_find` and `plan_chain` (`tools/recipe-export/`, `tools/recipes/`). Stage 3 (search) is live separately; Stage 5's item-cost pass and plan JSON export are not done. Planned 2026-10-31. Target: our own GTNH 2.9.0 pack. Expect our custom mods (GregGuns, then TrainHorizons) to add recipes, so every stage below has to be re-runnable from the pack, never hand-patched.
+Status: Stages 1, 2 and 4 live (2026-11-01; re-exported 2026-11-08 from tuxmine server pack 0.1.28, with GTNHRates): the export, `data/recipes.sqlite`, and the `recipes` MCP server with `recipe_producers`, `recipe_uses`, `recipe_get`, `item_find` and `plan_chain` (`tools/recipe-export/`, `tools/recipes/`). Stage 3 (search) is live separately; Stage 5's item-cost pass and plan JSON export are not done. Planned 2026-10-31. Target: our own GTNH 2.9.0 pack. Expect our custom mods (GregGuns, then TrainHorizons) to add recipes, so every stage below has to be re-runnable from the pack, never hand-patched.
 
 ## The question this answers
 
@@ -53,14 +53,25 @@ Dave's usual sequence:
 - [x] Programmed circuits are kept (zero-size stacks exported as not consumed; 34,155 circuit slots), and chanced outputs keep their chances (32,151). Input chances survive too (2).
 - [x] The full export runs against a 2.9.0 **server** instance, headless, with `-Dgtnh.oracle.autorun=true`: 261,217 raw recipes, 328 MB JSON, about 80-100 s of server time (Java 25 on the laptop; Java 21 on test-host, which `run.sh` can use through `RECIPE_EXPORT_HOST`). Two exports (Java 25 and Java 21) gave the same recipe hashes except 22 of 252,736 (19 CropsNH crop-breeder entries with rolled values, 2 infusion, 1 assembly line). What a server **cannot** export: Thaumcraft arcane crafting grids (they come from NEI on a client; those 621 recipes keep only output and vis and are flagged `incomplete`), essentia smelting (a client-only creative-tab call; partial) and CropsNH crop cards (client classes). 215 crafting recipes of IRecipe classes the exporter cannot read have no inputs and are flagged `incomplete` too. Neither kind is ever planned.
 
-**What `run.sh` puts in the server:** stock 2.9.0 + GregGuns, Fortunate One and WorldEdit from `tuxmine/server/`. DaveBridge, DiscordIntegration and JourneyMap Unlimited are left out (no recipes; DaveBridge opens a WebSocket listener and DiscordIntegration logs in to Discord); `RECIPE_EXPORT_SKIP` changes that. GregGuns' recipes arrive both through its GT maps (`gregguns.ammoPress`) and the crafting table.
+**What `run.sh` puts in the server:** stock 2.9.0 plus every server-side jar of `tuxmine/server/` and its `config/` (as of server pack 0.1.28: GregGuns, GTNHRates, EZStorage, Qz-Miner with its three Qz-UILib jars, Lost Cities: New Horizons, Fortunate One and WorldEdit). DaveBridge, DiscordIntegration and JourneyMap Unlimited are left out (no recipes; DaveBridge opens a WebSocket listener and DiscordIntegration logs in to Discord); `RECIPE_EXPORT_SKIP` changes that. GregGuns' recipes arrive both through its GT maps (`gregguns.ammoPress`, `gregguns.missileWorkbench`) and the crafting table. Of the others, only EZStorage adds recipes (9 shaped). Qz-Miner, Lost Cities and Fortunate One have no recipe code. Server configs that the live server gets through `COPY_CONFIG_SRC` rather than the pack are not seen.
+
+**GTNHRates is in the data.** Our `config/gtnhrates.cfg` sets `gtRecipesEnergyDiscount=64`. The per-category list (`!print, primitiveblastfurnace:64, gt.recipe.lathe:0`) changes nothing: entries without a colon and a value of 0 are ignored. On the first server tick, every recipe in `RecipeMap.ALL_RECIPE_MAPS` gets `duration = max(1, ceil(duration / 64))`; the same applies to assembly-line duration and research time. EU/t is unchanged, so a GT recipe costs about 1/64 of the stock total EU. Against the stock export, 181,775 recipes are exactly /64, and every one that kept its duration was either already 1 tick or a fuel or display map. One rock breaker recipe is /64 twice, because a GTNHRates mixin also divides at registration. **Not in the data:**
+- the electric and steam furnace speed-ups (applied when a recipe is looked up, not stored);
+- Railcraft coke oven times (there is no Railcraft adapter);
+- ore, oil, crop and bee yield multipliers (bees, crops and ores aren't normalized);
+- GT tool durability.
 
 **Running it:**
 1. Make a throwaway copy of our server pack under `.work/`. Never use the production container.
 2. Add the oracle jar and accept the EULA.
 3. Start with autorun on, then collect `GTNH-Calc-Oracle/gtnh-oracle-*.json`.
 
-This is `tools/recipe-export/run.sh <pack-dir>` (pack-dir = the extracted stock server zip, e.g. `.work/gtnh-2.9.0/pack`), run on every pack change. It ends by building the database.
+This is `tools/recipe-export/run.sh <pack-dir>` (pack-dir = the extracted stock server zip, e.g. `.work/gtnh-2.9.0/pack`), run on every pack change. It ends by building the database and stamping the `recipes` component (`tools/packstate.py stamp recipes`), so `packstate.py check` reports the database stale as soon as the server pack changes again.
+
+- **From a git worktree**, set `DAVE_AGENT_ROOT` to the main checkout: `tuxmine/`, `.work/` and `data/` are git-ignored and exist only there. `TUXMINE_DIR` overrides the pack location alone (default `<root>/tuxmine`, as in `packstate.py`).
+- **Our mods** come from `packstate.py jars --fetch`: plain jars from the pack, URL mods from the sha256-checked cache in `.work/tuxmine-jars`. They and the pack's `config/` are staged in `<work>/stage/`, which is also what a `RECIPE_EXPORT_HOST` run receives.
+- **Stamping rules.** The packstate fingerprint is taken before the export and written to `run-info.json` (`packstate`, which `build_db.py` keeps in `pack_meta.run_info`). The stamp is written only after a successful database build into `<root>/data/recipes.sqlite`, and only if the fingerprint is unchanged at the end. A crash, timeout, or a core adapter (ore dictionary, GT recipe maps, crafting, furnace) not reported `computed` stops the run before the database, so nothing is stamped.
+- **The export waits 20 server ticks** (`-Dgtnh.oracle.serverDelayTicks`, "Dave patch" in `ServerAutorunHandler.java`). GTNHRates rewrites every GT recipe's duration on the first server tick; upstream's export on `FMLServerStarted` showed stock durations and raced that tick.
 
 **Recipe IDs change between exports.** Key everything Dave saves on a content hash (map, inputs, outputs, EU/t, ticks), never on the exporter's ID. Their `carry-recipe-ids.mjs` shows the approach.
 
@@ -79,7 +90,7 @@ Normalize the oracle JSON into `data/recipes.sqlite`:
 
 FTS5 full-text search over item names is a cheap exact-name fallback alongside the embeddings.
 
-Their `normalize-oracle-export.mjs` (MIT) already has many hard-won rules: machine families, oredict alternatives, cells vs fluids. **Read it and port its rules; don't rediscover them.** Ported in `build_db.py` (its docstring lists them). Not ported: NEI layouts, icons, the synthesized "Tank" recipes, Sparge rolled byproducts, bees, crops, mob drops and ore veins (the export has them; `pack_meta.not_normalized` lists them). As built: 252,736 recipes, 893,977 io rows, 67,180 items, 181 maps, 154 MB, about 15 s and 1.6 GB peak memory. `recipes` also has `recycle` (GT's recycling flag), `fake` and `hidden`; `items` has `producers` and `uses` counts.
+Their `normalize-oracle-export.mjs` (MIT) already has many hard-won rules: machine families, oredict alternatives, cells vs fluids. **Read it and port its rules; don't rediscover them.** Ported in `build_db.py` (its docstring lists them). Not ported: NEI layouts, icons, the synthesized "Tank" recipes, Sparge rolled byproducts, bees, crops, mob drops and ore veins (the export has them; `pack_meta.not_normalized` lists them). As built (2026-11-08, server pack 0.1.28): 253,157 recipes (GT 183,863, crafting 57,469, smelting 9,751, Thaumcraft 2,074), 895,713 io rows, 67,249 items, 181 maps, 147 MB, about 11 s. The 0.1.6 build had 252,736 recipes; the growth is GregGuns 0.4.0 (+255 recipes making its items: cutting saw, assembler, missile workbench) and EZStorage (+9). **Every GT recipe hash changed with GTNHRates**, because the hash includes ticks, so recipe hashes saved before 2026-11-08 no longer resolve. `recipes` also has `recycle` (GT's recycling flag), `fake` and `hidden`; `items` has `producers` and `uses` counts.
 
 ## Stage 3: Semantic search (`gtnh_search`)
 
@@ -187,7 +198,12 @@ The objective is **lexicographic**, in the style of OrderedSet86/flow2. Each sta
 3. Machine count.
 4. Total flow.
 
-**As built** (`tools/recipes/planner.py`): stage 1 is EU per item **plus raw resources at an EU-equivalent price by class** (free 0, cheap 2,000, costly 100,000 per item or 1,000 L; anything unexpanded or unavailable at the player's tier 10,000,000). Pure machine EU made every ore-electrolysis byproduct route "best" for nitrogen, because mining costs no EU. Stages 2-4 follow as above. Recipes with 0 EU and no consumed input are never planned (the Eye of Harmony, algae pond and tree growth simulator recipes yield from nothing as data, and won every plan), nor are recycling, display-only (except the assembly line, rock breaker and tree farm maps) and incomplete recipes. Crafting tools are not consumed. Machine counts are at base speed. Golden tests: HV nitrogen = Multiblock Centrifuge on free air, 11,200 EU per 3,900 L = 2,871.8 EU per 1,000 L; the Vacuum Freezer route = air -> liquid air (VF) -> centrifuge, 17,993.5 EU per 1,000 L; EBF steel honours coil heat. Known gaps: ore commonness is not modelled (every ore is "cheap"), slot alternatives are not substituted, and 0-EU primitive machines (Bricked Blast Furnace, Coke Oven) win "least EU" for steel unless the player locks the EBF.
+**As built** (`tools/recipes/planner.py`): stage 1 is EU per item **plus raw resources at an EU-equivalent price by class** (free 0, cheap 2,000, costly 100,000 per item or 1,000 L; anything unexpanded or unavailable at the player's tier 10,000,000). Pure machine EU made every ore-electrolysis byproduct route "best" for nitrogen, because mining costs no EU. Stages 2-4 follow as above. Recipes with 0 EU and no consumed input are never planned (the Eye of Harmony, algae pond and tree growth simulator recipes yield from nothing as data, and won every plan), nor are recycling, display-only (except the assembly line, rock breaker and tree farm maps) and incomplete recipes. Crafting tools are not consumed. Machine counts are at base speed. Golden tests:
+- **HV nitrogen** = Multiblock Centrifuge on free air: 11,200 EU per 3,900 L = 2,871.8 EU per 1,000 L at stock durations (the sample), and 175 EU per run = 44.9 EU per 1,000 L with GTNHRates (the full DB);
+- **the Vacuum Freezer route** = air -> liquid air (VF) -> centrifuge: 17,993.5 EU per 1,000 L at stock durations, 639 EU with GTNHRates;
+- **EBF steel** honours coil heat.
+
+With GTNHRates, machine EU is about 1/64 of stock while the raw-resource prices above are unchanged, so raw inputs now weigh about 64 times more against machine work. The goldens still hold on the 0.1.28 DB. Known gaps: ore commonness is not modelled (every ore is "cheap"), slot alternatives are not substituted, and 0-EU primitive machines (Bricked Blast Furnace, Coke Oven) win "least EU" for steel unless the player locks the EBF.
 
 **3. Steering:**
 

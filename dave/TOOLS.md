@@ -121,13 +121,15 @@ The database path is `[paths] recipes` / `DAVE_RECIPES_DB` (production: the read
 e.g. `/dave/ro/recipes.sqlite`); a rebuilt file is picked up between calls. Standard library only, except
 `plan_chain`, which needs `highspy` (`tools/recipes/requirements.txt`; the image pip-installs it). Without it the
 other four tools still work and `plan_chain` says what is missing. In dev, run `dave_cmd.py` with a Python that has
-highspy (the MCP servers use `sys.executable`).
+highspy (the MCP servers use `sys.executable`). Durations and total EU are **as our server runs them**: GTNHRates sets
+every GT recipe to `ceil(stock ticks / 64)` and leaves EU/t alone, so wiki and NEI-on-stock figures are 64 times
+longer. Its furnace, coke oven and yield boosts are not in the database.
 
 | Tool | Does |
 |---|---|
 | `recipe_producers(item, tier?, heat?, cleanroom?, machine?, limit, offset)` | Recipes that make an item or fluid: machine, tier, EU/t, seconds, total EU, circuit, cleanroom, coil heat, every input and output with amounts, chances and slot alternatives. Real production first, recycling last |
 | `recipe_uses(item, ...)` | Recipes that consume or need it, same format |
-| `recipe_get(id)` | One recipe by its `#hash` (a content hash, stable across exports of the same pack), with its raw GT metadata and the machines that run its map |
+| `recipe_get(id)` | One recipe by its `#hash` (a content hash that includes the ticks: stable across exports of the same pack and rates config), with its raw GT metadata and the machines that run its map |
 | `item_find(name, k, kind?)` | FTS5 name search: ids, kinds, mods, ore dictionary names, producer and use counts |
 | `plan_chain(target, rate?, tier, heat?, cleanroom?, lowgrav?, locks?, free?, banned?, max_depth?, runner_up?)` | LP optimum (HiGHS, lexicographic: EU per item with raw resources priced by class, raw cost, machines, flow): chosen recipes with runs/s and machine counts, EU/t, EU per item, imports, byproducts, the runner-up and why it lost |
 

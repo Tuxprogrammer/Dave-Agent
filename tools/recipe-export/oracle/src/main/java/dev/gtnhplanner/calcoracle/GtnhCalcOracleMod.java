@@ -37,6 +37,14 @@ public final class GtnhCalcOracleMod {
             return;
         }
 
+        // Dave patch: wait for the server to tick (see ServerAutorunHandler).
+        int delayTicks = Integer.getInteger("gtnh.oracle.serverDelayTicks", 20).intValue();
+        if (delayTicks > 0 && Boolean.getBoolean("gtnh.oracle.autorun")) {
+            FMLCommonHandler.instance().bus().register(new ServerAutorunHandler(delayTicks));
+            LOG.info("GTNH calculation oracle export waits for {} server tick(s).", Integer.valueOf(delayTicks));
+            return;
+        }
+
         requestAutorunExport("server-started");
     }
 

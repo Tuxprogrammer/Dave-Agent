@@ -246,10 +246,17 @@ class ServerTests(SampleDB):
             os.environ.update(old)
 
 
-AIR_CENTRIFUGE = "888ef3a2730adc37"      # Multiblock Centrifuge: 10,000 L Air -> 1,000 L Oxygen + 3,900 L Nitrogen
+# Golden recipes in the sample (testdata/oracle-sample.json: stock GTNH durations).
+AIR_CENTRIFUGE = "888ef3a2730adc37"      # Multiblock Centrifuge: 10,000 L Air -> 1,000 L Oxygen + 3,900 L Nitrogen, 7 EU/t, 1,600 ticks
 VF_LIQUID_AIR = "c0e6c52705f119c6"       # Vacuum Freezer: 2,000 L Air -> 1,000 L Liquid Air, 480 EU/t, 28 ticks
-LIQUID_AIR_CENTRIFUGE = "f356296d18393dac"  # Multiblock Centrifuge: 53,000 L Liquid Air -> 40,000 L Nitrogen + ...
-EBF_STEEL = "4f296063c8aab45b"           # EBF: Cast Iron Dust + 1,000 L Oxygen, circuit 11 -> Steel Ingot, 1000 K
+LIQUID_AIR_CENTRIFUGE = "f356296d18393dac"  # Multiblock Centrifuge: 53,000 L Liquid Air -> 40,000 L Nitrogen + ..., 5 EU/t, 1,484 ticks
+
+# The same recipes in the full DB (data/recipes.sqlite). Our server pack runs GTNHRates, which sets every GT duration
+# to ceil(ticks / 64) (docs/plans/recipe-knowledge.md). The hash includes the ticks, so each hash differs.
+FULL_AIR_CENTRIFUGE = "f76208e340213ea2"          # 25 ticks
+FULL_VF_LIQUID_AIR = "a9ff9939ba889e1d"           # 1 tick
+FULL_LIQUID_AIR_CENTRIFUGE = "0e1a75fdcc11b572"   # 24 ticks
+EBF_STEEL = "a6a9fef58fed6461"           # EBF: Cast Iron Dust + 1,000 L Oxygen, circuit 11 -> Steel Ingot, 1000 K, 2 ticks
 
 
 def plan(con, **kw):
@@ -263,30 +270,34 @@ def hashes(res):
 
 
 class PlannerGolden:
-    """Golden chains, checked against our pack's exported recipes. Mixed into a sample-DB and a full-DB class."""
+    """Golden chains, checked against our pack's exported recipes. Mixed into a sample-DB and a full-DB class.
+    The class attributes are the sample's (stock durations); the full-DB class overrides them with GTNHRates'."""
+    air_centrifuge, vf_liquid_air, liquid_air_centrifuge = AIR_CENTRIFUGE, VF_LIQUID_AIR, LIQUID_AIR_CENTRIFUGE
+    hv_nitrogen_eu = 7 * 1600 / 3.9                       # 11,200 EU per run / 3.9 buckets = 2,871.8 EU per 1,000 L
+    vf_route_eu = 1.325 * 480 * 28 + 5 * 1484 / 40.0      # 17,993.5 EU per 1,000 L
 
     def test_hv_nitrogen(self):
-        """HV nitrogen: centrifuging free air. 11,200 EU per run / 3.9 buckets = 2,871.8 EU per 1,000 L."""
+        """HV nitrogen: centrifuging free air (EU per run / 3.9 buckets per 1,000 L)."""
         p, best, second = plan(self.con, target="Nitrogen", tier="HV")
-        self.assertEqual(best["main"], AIR_CENTRIFUGE)
-        self.assertAlmostEqual(best["eu_per_unit"] * 1000, 11200 / 3.9, delta=1.0)
+        self.assertEqual(best["main"], self.air_centrifuge)
+        self.assertAlmostEqual(best["eu_per_unit"] * 1000, self.hv_nitrogen_eu, delta=1.0)
         self.assertEqual([i for i, v, c in best["imports"]], ["fluid:air"])
         self.assertIsNotNone(second)
-        self.assertNotIn(AIR_CENTRIFUGE, hashes(second))
+        self.assertNotIn(self.air_centrifuge, hashes(second))
         text = p.text(best, second)
-        self.assertIn("RUNNER-UP (without #%s" % AIR_CENTRIFUGE, text)
+        self.assertIn("RUNNER-UP (without #%s" % self.air_centrifuge, text)
 
     def test_vacuum_freezer_lock(self):
         """'I'm using the Vacuum Freezer route': air -> liquid air in the VF, then liquid air -> nitrogen.
-        1,325 L liquid air per 1,000 L N = 1.325 VF runs (17,808 EU) + 7,420/40 EU of centrifuging = 17,993.5 EU."""
+        1,325 L liquid air per 1,000 L N = 1.325 VF runs + 1/40 of a liquid-air centrifuge run."""
         # The VF also cools Nitrogen Plasma into Nitrogen, but plasma needs a fusion reactor (LuV+): in the full
         # pack that import is 'unavailable' at HV and the planner routes around it. The sample has no fusion recipes,
         # so plasma would read as an ordinary raw resource there; banning it keeps both runs comparable.
         p, best, _ = plan(self.con, target="Nitrogen", tier="HV", locks=["Vacuum Freezer"],
                           banned=self.extra_vf_bans)
-        self.assertEqual(hashes(best), {VF_LIQUID_AIR, LIQUID_AIR_CENTRIFUGE})
+        self.assertEqual(hashes(best), {self.vf_liquid_air, self.liquid_air_centrifuge})
         self.assertEqual(best["lock_mode"], "route1")
-        self.assertAlmostEqual(best["eu_per_unit"] * 1000, 1.325 * 13440 + 7420 / 40.0, delta=1.0)
+        self.assertAlmostEqual(best["eu_per_unit"] * 1000, self.vf_route_eu, delta=1.0)
 
     def test_tier_filter(self):
         """At LV the HV vacuum freezer recipe is out, so the lock cannot be met."""
@@ -296,8 +307,8 @@ class PlannerGolden:
         self.assertTrue(all((s["recipe"]["tier"] or 0) <= 1 for s in best["steps"]))
 
     def test_ban_and_free(self):
-        _, best, _ = plan(self.con, target="Nitrogen", tier="HV", banned=[AIR_CENTRIFUGE])
-        self.assertNotIn(AIR_CENTRIFUGE, hashes(best))
+        _, best, _ = plan(self.con, target="Nitrogen", tier="HV", banned=[self.air_centrifuge])
+        self.assertNotIn(self.air_centrifuge, hashes(best))
         _, best, _ = plan(self.con, target="Nitrogen", tier="HV", banned=["Multiblock Centrifuge"])
         self.assertFalse(any(s["recipe"]["map"] == "gt.recipe.multicentrifuge" for s in best["steps"]))
 
@@ -341,6 +352,10 @@ class PlannerSampleTests(PlannerGolden, SampleDB):
 class PlannerFullDBTests(PlannerGolden, unittest.TestCase):
     """The same golden chains against the whole pack (data/recipes.sqlite): no other route may beat them."""
     extra_vf_bans = ()
+    air_centrifuge, vf_liquid_air = FULL_AIR_CENTRIFUGE, FULL_VF_LIQUID_AIR
+    liquid_air_centrifuge = FULL_LIQUID_AIR_CENTRIFUGE
+    hv_nitrogen_eu = 7 * 25 / 3.9                         # 44.9 EU per 1,000 L
+    vf_route_eu = 1.325 * 480 * 1 + 5 * 24 / 40.0         # 639 EU per 1,000 L
 
     @classmethod
     def setUpClass(cls):
