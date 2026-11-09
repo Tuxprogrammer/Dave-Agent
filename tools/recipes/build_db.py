@@ -450,8 +450,21 @@ CREATE INDEX machines_map ON machines(map);
 """
 
 
+# Adapters the database is made of. If the oracle lists one with any other status than "computed" (it reports
+# "missing" when the adapter threw), the export is partial and no database is built from it.
+CORE_ADAPTERS = ("ore-dictionary", "gregtech-recipe-maps", "minecraft-forge-crafting", "minecraft-furnace")
+
+
+def check_adapters(export):
+    status = {a.get("id"): a.get("status") for a in export.get("adapters") or []}
+    bad = ["%s=%s" % (a, status[a]) for a in CORE_ADAPTERS if a in status and status[a] != "computed"]
+    if bad:
+        raise SystemExit("partial export, not building a database: " + ", ".join(bad))
+
+
 def build(export, db_path, run_info=None):
     t0 = time.time()
+    check_adapters(export)
     b = Builder()
     doms = {d.get("id"): d for d in export.get("domains") or []}
     if "gregtech" in doms:

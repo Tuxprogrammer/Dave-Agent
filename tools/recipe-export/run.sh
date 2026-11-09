@@ -5,48 +5,65 @@
 #
 # <pack-dir> is a stock GTNH server directory (the extracted GT_New_Horizons_<ver>_Server zip, e.g.
 # .work/gtnh-2.9.0/pack). It is only read: the run copies it to $RECIPE_EXPORT_WORK/server, adds our server
-# pack's mods from tuxmine/server/ and the oracle jar, starts it with -Dgtnh.oracle.autorun=true, and collects
-# the JSON the oracle writes on FMLServerStarted before it exits the JVM. Nothing connects to the production
-# server; the copy listens on 127.0.0.1 only, on a spare port, with online-mode off.
+# pack's mods and configs from $TUXMINE_DIR/server and the oracle jar, starts it with -Dgtnh.oracle.autorun=true,
+# and collects the JSON the oracle writes 20 server ticks after start (some mods, GTNHRates among them, rewrite
+# recipes on the first tick) before it exits the JVM. Nothing connects to the production server; the copy listens
+# on 127.0.0.1 only, on a spare port, with online-mode off.
 #
-# Then it builds the recipe database (tools/recipes/build_db.py) unless RECIPE_EXPORT_NO_DB=1.
+# Then it builds the recipe database (tools/recipes/build_db.py) unless RECIPE_EXPORT_NO_DB=1, and stamps the
+# `recipes` component with tools/packstate.py when that database is <root>/data/recipes.sqlite and the packs did
+# not change during the run. A failed or partial export (oracle crash, timeout, a core adapter not "computed")
+# builds nothing and stamps nothing.
+#
+# Our server pack's jars come from `packstate.py jars --fetch`: plain jars from the pack, URL mods from the
+# sha256-checked cache in <root>/.work/tuxmine-jars (downloaded on first use). Only jars the server pack carries
+# and packwiz would install on a server (side != client) are added.
 #
 # Environment (all optional):
-#   RECIPE_EXPORT_WORK   scratch dir            default <repo>/.work/recipe-export
-#   RECIPE_EXPORT_OUT    where the JSON lands    default <repo>/data/exports/recipes
-#   DAVE_RECIPES_DB      the database to build   default <repo>/data/recipes.sqlite
-#   JAVA                 java binary (17+)       default /usr/lib/jvm/java-25-openjdk/bin/java, else `java`
+#   DAVE_AGENT_ROOT      checkout whose tuxmine/, data/ and .work/ are used (default: this repo). Set it to the
+#                        main checkout when running from a git worktree, which lacks the git-ignored data
+#   TUXMINE_DIR          our packwiz packs         default <root>/tuxmine
+#   RECIPE_EXPORT_WORK   scratch dir               default <root>/.work/recipe-export
+#   RECIPE_EXPORT_OUT    where the JSON lands       default <root>/data/exports/recipes
+#   DAVE_RECIPES_DB      the database to build      default <root>/data/recipes.sqlite
+#   JAVA                 java binary (17+)          default /usr/lib/jvm/java-25-openjdk/bin/java, else `java`
 #   JAVA_HOME_BUILD      JDK for the Gradle build (default: the JDK of $JAVA if it has javac, else java-25)
-#   RECIPE_EXPORT_MEM    max heap                default 6G (GTNH 2.9.0 needs about 5-6 GB)
+#   RECIPE_EXPORT_MEM    max heap                   default 6G (GTNH 2.9.0 needs about 5-6 GB)
 #   RECIPE_EXPORT_LOCK   lock file; only one heavy JVM at a time across agents  default /tmp/dave-agent-heavy-jvm.lock
-#   RECIPE_EXPORT_TIMEOUT seconds                default 3600
-#   RECIPE_EXPORT_PORT   server port             default 25599
-#   RECIPE_EXPORT_SKIP   space-separated jar-name prefixes from tuxmine/server/mods to leave out
+#   RECIPE_EXPORT_TIMEOUT seconds                   default 3600
+#   RECIPE_EXPORT_PORT   server port                default 25599
+#   RECIPE_EXPORT_SKIP   space-separated jar-name prefixes from the server pack to leave out
 #                        default "davebridge DiscordIntegration journeymap" (no recipes; DaveBridge opens a
 #                        WebSocket listener and DiscordIntegration logs in to Discord)
 #   ORACLE_JAR           use this oracle jar instead of building tools/recipe-export/oracle
 #   RECIPE_EXPORT_HOST   run the server on this ssh host instead (e.g. a big build box). The oracle jar is built
-#                        here; run.sh, tuxmine/server/ (public pack files only) and the pack are rsynced to
+#                        and our mods are resolved here; run.sh, the staged mods/configs and the pack are rsynced to
 #                        RECIPE_EXPORT_REMOTE_DIR (required with HOST), the export runs there with
 #                        RECIPE_EXPORT_REMOTE_JAVA (default `java`), and the JSON is rsynced back to RECIPE_EXPORT_OUT.
-#                        The database is always built here. Nothing is left running on the host.
+#                        The database is always built (and stamped) here. Nothing is left running on the host.
+#   RECIPE_EXPORT_STAGED internal: a staged mods/ + config/ + stage.json dir to use instead of resolving the pack
+#                        (the remote run gets this; it has no tuxmine/ and no packstate.py)
 set -euo pipefail
 
-usage() { sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 [[ $# -eq 1 && "$1" != -h && "$1" != --help ]] || usage
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 pack_dir="$(cd "$1" && pwd)"
-work="${RECIPE_EXPORT_WORK:-$repo/.work/recipe-export}"
-out="${RECIPE_EXPORT_OUT:-$repo/data/exports/recipes}"
-db="${DAVE_RECIPES_DB:-$repo/data/recipes.sqlite}"
+root="${DAVE_AGENT_ROOT:-$repo}"
+root="$(cd "$root" && pwd)"
+tux="${TUXMINE_DIR:-$root/tuxmine}"
+work="${RECIPE_EXPORT_WORK:-$root/.work/recipe-export}"
+out="${RECIPE_EXPORT_OUT:-$root/data/exports/recipes}"
+db="${DAVE_RECIPES_DB:-$root/data/recipes.sqlite}"
 mem="${RECIPE_EXPORT_MEM:-6G}"
 lock="${RECIPE_EXPORT_LOCK:-/tmp/dave-agent-heavy-jvm.lock}"
 timeout_s="${RECIPE_EXPORT_TIMEOUT:-3600}"
 port="${RECIPE_EXPORT_PORT:-25599}"
 skip="${RECIPE_EXPORT_SKIP:-davebridge DiscordIntegration journeymap}"
-server_pack="$repo/tuxmine/server"
+server_pack="$tux/server"
+staged="${RECIPE_EXPORT_STAGED:-}"
 
 if [[ -n "${JAVA:-}" ]]; then java_bin="$JAVA"
 elif [[ -x /usr/lib/jvm/java-25-openjdk/bin/java ]]; then java_bin=/usr/lib/jvm/java-25-openjdk/bin/java
@@ -58,10 +75,84 @@ die() { log "ERROR: $*" >&2; exit 1; }
 for f in lwjgl3ify-forgePatches.jar java9args.txt mods config; do
   [[ -e "$pack_dir/$f" ]] || die "$pack_dir is not a GTNH Java 17+ server directory (no $f)"
 done
-[[ -d "$server_pack/mods" ]] || die "no $server_pack/mods"
-case "$work" in ""|/|"$HOME"|"$repo") die "refusing RECIPE_EXPORT_WORK=$work";; esac
+case "$work" in ""|/|"$HOME"|"$repo"|"$root") die "refusing RECIPE_EXPORT_WORK=$work";; esac
 
 log "pack: $pack_dir"
+
+# packstate.py with this run's packs (the pack dir given, $TUXMINE_DIR, $DAVE_AGENT_ROOT)
+packstate() {
+  DAVE_AGENT_ROOT="$root" TUXMINE_DIR="$tux" GTNH_PACK_DIR="$pack_dir" python3 -I "$repo/tools/packstate.py" "$@"
+}
+recipes_fingerprint() {
+  packstate show | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["fingerprints"]["recipes"])'
+}
+
+# ---------------------------------------------------------------- 0. our server pack: mods and configs, staged
+if [[ -n "$staged" ]]; then
+  [[ -f "$staged/stage.json" && -d "$staged/mods" ]] || die "RECIPE_EXPORT_STAGED=$staged is not a staged dir"
+else
+  [[ -f "$server_pack/pack.toml" ]] || die "no $server_pack/pack.toml (set TUXMINE_DIR or DAVE_AGENT_ROOT)"
+  case "$work" in "$tux"|"$tux"/*) die "refusing RECIPE_EXPORT_WORK inside $tux";; esac
+  staged="$work/stage"
+  rm -rf "$staged"
+  mkdir -p "$staged/mods" "$staged/config"
+  fingerprint="$(recipes_fingerprint)"
+  log "resolving $server_pack (packstate recipes fingerprint $fingerprint)"
+  packstate jars --fetch > "$staged/jars.json"
+  skipped() { local n="${1,,}" p; for p in $skip; do [[ "$n" == "${p,,}"* ]] && return 0; done; return 1; }
+  while IFS=$'\t' read -r name path; do
+    if skipped "$name"; then log "skip $name"; continue; fi
+    [[ -f "$path" ]] || die "no file for $name ($path)"
+    cp "$path" "$staged/mods/$name"
+  done < <(python3 -I -c '
+import json, sys
+for e in json.load(open(sys.argv[1], encoding="utf-8")):
+    if "server" in e["packs"] and e.get("pw_side") != "client":
+        print(e["name"] + "\t" + (e["path"] or ""))' "$staged/jars.json")
+  if [[ -d "$server_pack/config" ]]; then cp -r "$server_pack/config/." "$staged/config/"; fi
+  python3 -I - "$staged" "$server_pack/pack.toml" "$fingerprint" <<'PY'
+import hashlib, json, os, sys, tomllib
+staged, toml, fp = sys.argv[1:]
+pack = tomllib.loads(open(toml, encoding="utf-8").read())
+cfg = os.path.join(staged, "config")
+configs = {}
+for d, _, files in os.walk(cfg):
+    for f in files:
+        p = os.path.join(d, f)
+        configs[os.path.relpath(p, cfg)] = hashlib.sha256(open(p, "rb").read()).hexdigest()
+info = {"tuxmine_server_version": pack.get("version"), "tuxmine_server_index_hash": pack.get("index", {}).get("hash"),
+        "packstate": {"component": "recipes", "fingerprint": fp},
+        "added_mods": sorted(os.listdir(os.path.join(staged, "mods")), key=str.lower),
+        "tuxmine_configs": dict(sorted(configs.items()))}
+json.dump(info, open(os.path.join(staged, "stage.json"), "w", encoding="utf-8"), indent=2)
+PY
+fi
+fingerprint="$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["packstate"]["fingerprint"])' \
+  "$staged/stage.json")"
+
+# Stamp `recipes` after a successful database build, if that database is the one packstate tracks and the packs
+# are still the ones this run exported.
+stamp_recipes() {
+  local want now
+  want="$(realpath -m "$root/data/recipes.sqlite")"
+  if [[ "$(realpath -m "$db")" != "$want" ]]; then
+    log "not stamping recipes: $db is not $want"; return 0
+  fi
+  now="$(recipes_fingerprint)"
+  if [[ "$now" != "$fingerprint" ]]; then
+    log "WARNING: the packs changed during the export ($fingerprint -> $now); not stamping recipes. Run again."
+    return 0
+  fi
+  packstate stamp recipes --note "tools/recipe-export/run.sh: $(python3 -I -c '
+import json, sys; i = json.load(open(sys.argv[1])); print("tuxmine-server %s, export %s" % (
+    i.get("tuxmine_server_version"), i.get("finished_at")))' "$out/run-info.json")"
+}
+
+build_db() {
+  log "building $db"
+  python3 -I "$repo/tools/recipes/build_db.py" "$out/oracle-export.json" "$db" --run-info "$out/run-info.json"
+  stamp_recipes
+}
 
 # ---------------------------------------------------------------- 1. the oracle jar
 if [[ -n "${ORACLE_JAR:-}" ]]; then
@@ -88,15 +179,15 @@ if [[ -n "${RECIPE_EXPORT_HOST:-}" ]]; then
   case "$rdir" in /|/home|/home/*/|/srv|/tmp|"~") die "refusing RECIPE_EXPORT_REMOTE_DIR=$rdir";; esac
   ssh_opts=(-o BatchMode=yes -o ServerAliveInterval=30)
   log "remote: $host:$rdir"
-  ssh "${ssh_opts[@]}" "$host" "mkdir -p '$rdir/repo/tools/recipe-export' '$rdir/repo/tuxmine' '$rdir/out'"
+  ssh "${ssh_opts[@]}" "$host" "mkdir -p '$rdir/repo/tools/recipe-export' '$rdir/stage' '$rdir/out'"
   rsync -a --delete "$here/run.sh" "$host:$rdir/repo/tools/recipe-export/run.sh"
-  rsync -a --delete --exclude '.env' --exclude '*.cfg.local' "$server_pack/" "$host:$rdir/repo/tuxmine/server/"
+  rsync -a --delete "$staged/" "$host:$rdir/stage/"
   rsync -a --delete --exclude 'World/' --exclude 'logs/' --exclude 'crash-reports/' "$pack_dir/" "$host:$rdir/pack/"
   rsync -a "$oracle_jar" "$host:$rdir/$(basename "$oracle_jar")"
   set +e
   ssh "${ssh_opts[@]}" "$host" "cd '$rdir' && RECIPE_EXPORT_NO_DB=1 ORACLE_JAR='$rdir/$(basename "$oracle_jar")' \
     JAVA='${RECIPE_EXPORT_REMOTE_JAVA:-java}' RECIPE_EXPORT_PORT='$port' RECIPE_EXPORT_MEM='$mem' \
-    RECIPE_EXPORT_TIMEOUT='$timeout_s' RECIPE_EXPORT_SKIP='$skip' RECIPE_EXPORT_LOCK='$rdir/.lock' \
+    RECIPE_EXPORT_TIMEOUT='$timeout_s' RECIPE_EXPORT_LOCK='$rdir/.lock' RECIPE_EXPORT_STAGED='$rdir/stage' \
     RECIPE_EXPORT_WORK='$rdir/work' RECIPE_EXPORT_OUT='$rdir/out' bash '$rdir/repo/tools/recipe-export/run.sh' '$rdir/pack'"
   code=$?
   set -e
@@ -104,12 +195,11 @@ if [[ -n "${RECIPE_EXPORT_HOST:-}" ]]; then
   ssh "${ssh_opts[@]}" "$host" "pkill -f -- '-Dgtnh.oracle.outputDir=$rdir/' || true" || true
   [[ $code -eq 0 ]] || die "remote export failed ($code); log: $host:$rdir/work/server.log"
   mkdir -p "$out"
+  rm -f "$out/oracle-export.json" "$out/run-info.json"
   rsync -a "$host:$rdir/out/" "$out/"
+  [[ -f "$out/oracle-export.json" && -f "$out/run-info.json" ]] || die "the remote run left no export in $rdir/out"
   log "export: $out/oracle-export.json ($(du -h "$out/oracle-export.json" | cut -f1)) from $host"
-  if [[ "${RECIPE_EXPORT_NO_DB:-0}" != 1 ]]; then
-    log "building $db"
-    python3 -I "$repo/tools/recipes/build_db.py" "$out/oracle-export.json" "$db" --run-info "$out/run-info.json"
-  fi
+  if [[ "${RECIPE_EXPORT_NO_DB:-0}" != 1 ]]; then build_db; fi
   log "done"
   exit 0
 fi
@@ -121,40 +211,19 @@ log "java: $java_bin (Java $java_major)"
 # ---------------------------------------------------------------- 2. throwaway server copy
 server="$work/server"
 records="$work/oracle-records"
-cache="$work/cache"
-mkdir -p "$work" "$cache"
+mkdir -p "$work"
 rm -rf "$server" "$records"
 log "copying the server to $server"
 cp -a --reflink=auto "$pack_dir" "$server"
 rm -rf "$server/World" "$server/logs" "$server/crash-reports" "$server/GTNH-Calc-Oracle"
 find "$server/mods" -maxdepth 1 -iname '*gtnh*calc*oracle*.jar' -delete
 
-# our server pack: plain jars, then URL mods (sha256-checked, cached), then config
-skipped() { local n="${1,,}" p; for p in $skip; do [[ "$n" == "${p,,}"* ]] && return 0; done; return 1; }
 added=()
-for jar in "$server_pack"/mods/*.jar; do
+for jar in "$staged"/mods/*.jar; do
   [[ -e "$jar" ]] || continue
-  name="$(basename "$jar")"
-  if skipped "$name"; then log "skip $name"; continue; fi
-  cp "$jar" "$server/mods/"; added+=("$name")
+  cp "$jar" "$server/mods/"; added+=("$(basename "$jar")")
 done
-for meta in "$server_pack"/mods/*.pw.toml; do
-  [[ -e "$meta" ]] || continue
-  name="$(sed -n 's/^filename *= *"\(.*\)"/\1/p' "$meta")"
-  url="$(sed -n 's/^url *= *"\(.*\)"/\1/p' "$meta")"
-  sha="$(sed -n 's/^hash *= *"\(.*\)"/\1/p' "$meta")"
-  fmt="$(sed -n 's/^hash-format *= *"\(.*\)"/\1/p' "$meta")"
-  [[ -n "$name" && -n "$url" && -n "$sha" && "$fmt" == sha256 ]] || die "cannot read $meta"
-  if skipped "$name"; then log "skip $name"; continue; fi
-  if [[ ! -f "$cache/$name" ]] || [[ "$(sha256sum "$cache/$name" | cut -d' ' -f1)" != "$sha" ]]; then
-    log "download $name"
-    curl -fsSL --retry 2 -o "$cache/$name.part" "$url"
-    [[ "$(sha256sum "$cache/$name.part" | cut -d' ' -f1)" == "$sha" ]] || die "sha256 mismatch for $name"
-    mv "$cache/$name.part" "$cache/$name"
-  fi
-  cp "$cache/$name" "$server/mods/"; added+=("$name")
-done
-if [[ -d "$server_pack/config" ]]; then cp -r "$server_pack/config/." "$server/config/"; fi
+if [[ -d "$staged/config" ]]; then cp -r "$staged/config/." "$server/config/"; fi
 cp "$oracle_jar" "$server/mods/"
 log "added: ${added[*]:-none}"
 
@@ -213,17 +282,15 @@ mkdir -p "$out"
 cp "$json" "$out/oracle-export.json"
 pack_version="$(sed -n 's/^motd=.*Horizons \([0-9][0-9.a-zA-Z-]*\).*$/\1/p' "$pack_dir/server.properties" | head -n 1)"
 python3 -I - "$out/run-info.json" "$pack_dir" "$server/mods" "$oracle_jar" "$java_bin" "$java_major" \
-    "$elapsed" "${pack_version:-unknown}" "$server_pack/pack.toml" "${added[*]:-}" <<'PY'
+    "$elapsed" "${pack_version:-unknown}" "$staged/stage.json" <<'PY'
 import hashlib, json, os, sys, time
-out, pack_dir, mods, jar, java, major, elapsed, version, server_toml, added = sys.argv[1:]
-tux = ""
-for line in open(server_toml, encoding="utf-8"):
-    if line.startswith("version"):
-        tux = line.split("=", 1)[1].strip().strip('"')
-        break
+out, pack_dir, mods, jar, java, major, elapsed, version, stage = sys.argv[1:]
+stage = json.load(open(stage, encoding="utf-8"))
 info = {
-    "pack_version": version, "tuxmine_server_version": tux, "pack_dir": pack_dir,
-    "added_mods": added.split(), "mod_jars": sorted(f for f in os.listdir(mods) if f.endswith(".jar")),
+    "pack_version": version, "tuxmine_server_version": stage.get("tuxmine_server_version"),
+    "tuxmine_server_index_hash": stage.get("tuxmine_server_index_hash"), "packstate": stage.get("packstate"),
+    "pack_dir": pack_dir, "added_mods": stage.get("added_mods"), "tuxmine_configs": stage.get("tuxmine_configs"),
+    "mod_jars": sorted(f for f in os.listdir(mods) if f.endswith(".jar")),
     "oracle_jar": os.path.basename(jar), "oracle_sha256": hashlib.sha256(open(jar, "rb").read()).hexdigest(),
     "java": java, "java_major": int(major), "export_seconds": int(elapsed),
     "finished_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -232,8 +299,5 @@ json.dump(info, open(out, "w"), indent=2)
 PY
 log "export: $out/oracle-export.json ($(du -h "$out/oracle-export.json" | cut -f1))"
 
-if [[ "${RECIPE_EXPORT_NO_DB:-0}" != 1 ]]; then
-  log "building $db"
-  python3 -I "$repo/tools/recipes/build_db.py" "$out/oracle-export.json" "$db" --run-info "$out/run-info.json"
-fi
+if [[ "${RECIPE_EXPORT_NO_DB:-0}" != 1 ]]; then build_db; fi
 log "done"
