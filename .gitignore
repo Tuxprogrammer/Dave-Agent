@@ -38,3 +38,6 @@ gtnh-src/*
 
 # Agent worktrees
 .claude/worktrees/
+
+# Pack provenance stamps written by tools/packstate.py (which pack each baked artifact was built from)
+data/packstate/
