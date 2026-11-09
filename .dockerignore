@@ -6,6 +6,7 @@
 !data/index/
 !data/memory/README.md
 !data/recipes.sqlite
+!data/packstate/
 !gtnh-src/
 !DaveBridge/PROTOCOL.md
 !DaveBridge/docs/dave-markup.md

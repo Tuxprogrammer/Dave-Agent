@@ -43,6 +43,8 @@ COPY --chown=root:root data/corpus/ /dave/ro/corpus/
 COPY --chown=root:root data/memory/README.md /dave/seed/memory/README.md
 # Recipe database exported from our own pack (tools/recipe-export, tools/recipes/build_db.py).
 COPY --chown=root:root data/recipes.sqlite /dave/ro/recipes.sqlite
+# Which GTNH + tuxmine pack each baked artifact above was built from (tools/packstate.py; build.sh refuses stale ones).
+COPY --chown=root:root data/packstate/ /dave/ro/packstate/
 
 # Optional Python dependencies of tools (the recipe planner's HiGHS). Everything else is standard library only.
 COPY tools/ /dave/app/tools/
