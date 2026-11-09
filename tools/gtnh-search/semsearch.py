@@ -7,6 +7,7 @@ import base64
 import fcntl
 import hashlib
 import http.client
+import importlib.util
 import json
 import os
 import re
@@ -93,9 +94,17 @@ class Context:
     <state>/corpus and <state>/index, and GTNH_SEARCH_DATA / GTNH_SEARCH_INDEX_DIR name the read-only seed baked into
     the image, which seed() copies into the state directory."""
 
-    def __init__(self, root=None, pack=None, corpus=None, index=None, memory=None, gtsrc=None, readonly=None, state=None):
+    def __init__(self, root=None, pack=None, corpus=None, index=None, memory=None, gtsrc=None, readonly=None, state=None,
+                 tuxmine=None, jar_cache=None):
         self.root = Path(root) if root else repo_root()
         self.pack = Path(pack) if pack else find_pack(self.root)
+        # Our extra mods: the tuxmine packwiz packs layered on the GTNH pack, and the cache packstate downloads their
+        # URL mods into. Both absent in the image.
+        self.tuxmine = Path(tuxmine or os.environ.get("TUXMINE_DIR") or self.root / "tuxmine")
+        self.jar_cache = Path(jar_cache or os.environ.get("TUXMINE_JAR_CACHE") or self.root / ".work" / "tuxmine-jars")
+        self._extras = (None, [], None)
+        # Per cached kind, the packs its docs were extracted from: {"pack": packstate fingerprint, "pack_label": text}.
+        self.extracted = {}
         self.seed_corpus = Path(corpus or os.environ.get("GTNH_SEARCH_DATA") or self.root / "data" / "corpus")
         self.seed_index = Path(index or os.environ.get("GTNH_SEARCH_INDEX_DIR") or self.root / "data" / "index")
         state = state or os.environ.get("GTNH_SEARCH_STATE")
@@ -124,6 +133,43 @@ class Context:
 
     def has_pack(self):
         return bool(self.pack and self.pack.is_dir())
+
+    def extra_jars(self):
+        """The tuxmine packs' jars, as packstate.jars() lists them (name, sha256, packs, path; path is None for a URL
+        mod not downloaded yet). Only alongside a GTNH pack; empty without tuxmine/ (the image). Memoized on the
+        packs' and the jar cache's file listings, so a long-lived server notices a pack change."""
+        return self._extra_state()[1]
+
+    def extras_error(self):
+        return self._extra_state()[2]
+
+    def _extra_state(self):
+        sides = [self.tuxmine / side for side in ("server", "client")]
+        if not self.has_pack() or not any((d / "index.toml").is_file() for d in sides):
+            return (None, [], None)
+        key = tuple((str(d), tuple(file_listing(d))) for d in [*sides, *(d / "mods" for d in sides), self.jar_cache])
+        if self._extras[0] == key:
+            return self._extras
+        ps, jars, error = load_packstate(), [], None
+        try:
+            if ps is None:
+                raise RuntimeError("tools/packstate.py could not be loaded (it needs Python 3.11 or newer)")
+            jars = ps.jars(tuxmine=self.tuxmine, cache=self.jar_cache)
+        except (Exception, SystemExit) as e:  # a broken pack must not take a refresh down; it blocks stamping instead
+            jars, error = [], "tuxmine jars: %s" % e
+        self._extras = (key, jars, error)  # replaced, never mutated: copy.copy(ctx) shares it
+        return self._extras
+
+    def extra_inputs(self):
+        """Fingerprint tokens for the tuxmine jars: each jar's name and sha256, and whether its file can be read."""
+        out = ["tuxmine:%s:%s:%s" % (e["name"], e["sha256"], "ok" if e["path"] else "missing") for e in self.extra_jars()]
+        if self.extras_error():
+            out.append("tuxmine:error")
+        return out
+
+    def note_extracted(self, kind, header):
+        # Replaced, never mutated: copy.copy(ctx) (the living wiki's build) must not write into the original's dict.
+        self.extracted = dict(self.extracted, **{kind: {"pack": header.get("pack"), "pack_label": header.get("pack_label")}})
 
     def names(self):
         """Item names for this pass. corpus_chunks() resets them, so a long-lived server never renders with stale names."""
@@ -322,6 +368,115 @@ def seed(ctx, force=False, log=lambda s: None):
     return True
 
 
+def file_listing(d):
+    """(name, size, mtime) of each file directly in d; empty when d is missing."""
+    out = []
+    try:
+        entries = list(os.scandir(d))
+    except OSError:
+        return out
+    for e in entries:
+        try:
+            if e.is_file():
+                st = e.stat()
+                out.append((e.name, st.st_size, st.st_mtime_ns))
+        except OSError:
+            continue
+    return sorted(out)
+
+
+# Pack freshness. tools/packstate.py lists the tuxmine jars and records which packs each derived artifact was built
+# from (stamps). Each cached kind's docs.jsonl header carries the packstate fingerprint it was extracted from, and an
+# index carries those of the docs it embedded, so a stamp can only vouch for data really built from the current packs.
+
+_PACKSTATE = []
+
+
+def load_packstate():
+    """tools/packstate.py as a module, or None where it is missing or cannot load (it needs Python 3.11's tomllib).
+    Loaded by path, so neither python3 -I nor the caller's sys.path matters."""
+    if not _PACKSTATE:
+        try:
+            spec = importlib.util.spec_from_file_location("dave_packstate", Path(__file__).resolve().parents[1] / "packstate.py")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+        except Exception:  # noqa: BLE001  (a missing file or an old Python: no stamps and no tuxmine jars)
+            mod = None
+        _PACKSTATE.append(mod)
+    return _PACKSTATE[0]
+
+
+def pack_identity(ctx):
+    """(identity, None) for the packs ctx extracts from, identity being {"fingerprint": packstate's corpus fingerprint,
+    "label": "GTNH 2.9.0, tuxmine server 0.1.23, client 0.1.21"}; or (None, reason) when a stamp would not be truthful:
+    no GTNH pack (the image), packstate unavailable or resolving other directories than ctx (set DAVE_AGENT_ROOT like
+    GTNH_SEARCH_ROOT), or a tuxmine jar that is not downloaded or not readable."""
+    if not ctx.has_pack():
+        return None, "no GTNH pack"
+    ps = load_packstate()
+    if ps is None:
+        return None, "tools/packstate.py could not be loaded"
+    try:
+        theirs = ps.gtnh_pack_dir()
+        if theirs is None or Path(theirs).resolve() != ctx.pack.resolve():
+            return None, "packstate sees the GTNH pack at %s, the corpus reads %s" % (theirs, ctx.pack)
+        if Path(ps.tuxmine_dir()).resolve() != ctx.tuxmine.resolve():
+            return None, "packstate sees tuxmine at %s, the corpus reads %s" % (ps.tuxmine_dir(), ctx.tuxmine)
+        if ctx.extras_error():
+            return None, ctx.extras_error()
+        missing = [e["name"] for e in ctx.extra_jars() if not e["path"]]
+        if missing:
+            return None, "tuxmine jars not downloaded: %s" % ", ".join(missing)
+        st = ps.state()
+    except (Exception, SystemExit) as e:
+        return None, "packstate failed: %s" % e
+    if not st.get("gtnh_version"):
+        return None, "unknown GTNH version"
+    tux = ", ".join("%s %s" % (side, st["tuxmine"][side]["version"]) for side in ("server", "client") if st["tuxmine"].get(side))
+    return {"fingerprint": st["fingerprints"]["corpus"],
+            "label": "GTNH %s" % st["gtnh_version"] + (", tuxmine " + tux if tux else "")}, None
+
+
+def fetch_extras(ctx, log=lambda s: None):
+    """Downloads the tuxmine packs' URL mods into the jar cache (sha256-checked by packstate), so an extraction reads
+    every jar. Returns an error message, or None, also when there is nothing to fetch (no pack, no tuxmine/)."""
+    if not ctx.has_pack() or not any((ctx.tuxmine / side / "index.toml").is_file() for side in ("server", "client")):
+        return None
+    ps = load_packstate()
+    if ps is None:
+        return "tools/packstate.py could not be loaded (it needs Python 3.11 or newer)"
+    try:
+        jars = ps.jars(fetch=True, tuxmine=ctx.tuxmine, cache=ctx.jar_cache)
+    except (Exception, SystemExit) as e:
+        return "fetching the tuxmine jars failed: %s" % e
+    log("tuxmine: %d jars (%d of them URL mods, in %s)" % (len(jars), sum(e["origin"] == "url" for e in jars), ctx.jar_cache))
+    return None
+
+
+def pack_kinds(profile=DEFAULT_PROFILE):
+    """The profile's kinds extracted from the packs (the cached ones); wiki, playbook and memory are not pack data."""
+    return [k for k in PROFILES[profile]["kinds"] if SOURCES[k].cache]
+
+
+def stale_kinds(extracted, fingerprint_now, profile=DEFAULT_PROFILE):
+    """Pack kinds whose docs were not extracted from the packs with fingerprint_now. extracted: {kind: fingerprint}."""
+    return [k for k in pack_kinds(profile) if not fingerprint_now or (extracted or {}).get(k) != fingerprint_now]
+
+
+def stamp_pack(ctx, component, fingerprint_now, note=None):
+    """packstate.stamp(component), kept only if the packs still have fingerprint_now: if they changed while it was
+    written, the stamp is removed, so it never vouches for data built from other packs. Returns the record or None."""
+    ps = load_packstate()
+    rec = ps.stamp(component, note)
+    if rec["fingerprint"] != fingerprint_now:
+        try:
+            (ps.stamp_dir() / ("%s.json" % component)).unlink()
+        except OSError:
+            pass
+        return None
+    return rec
+
+
 def index_path(ctx, profile=DEFAULT_PROFILE, model=None):
     model = model or PROFILES[profile]["model"]
     return ctx.index / ("%s__%s.npz" % (profile, model.replace("/", "_").replace(":", "_")))
@@ -378,13 +533,17 @@ def source(kind, inputs, chunk=None, cache=True, doc="", deps=None):
 
 
 def fingerprint(paths):
+    """Paths by name, size and mtime, plus plain-string tokens taken as they are (the tuxmine jars' sha256)."""
     h = hashlib.sha256(("v%d" % EXTRACT_VERSION).encode())
-    for p in sorted(set(paths)):
+    items = set(paths)
+    for p in sorted(x for x in items if not isinstance(x, str)):
         try:
             st = p.stat()
         except OSError:
             continue
         h.update(("%s\0%d\0%d\n" % (p, st.st_size, st.st_mtime_ns)).encode("utf-8", "replace"))
+    for token in sorted(x for x in items if isinstance(x, str)):
+        h.update(("%s\n" % token).encode("utf-8", "replace"))
     return h.hexdigest()[:24]
 
 
@@ -417,17 +576,35 @@ def load_docs(ctx, kind, force=False, log=lambda s: None):
     inputs = src.inputs(ctx) if ctx.has_pack() or cached is None or force else []
     if cached is not None and not force:
         if not inputs or ctx.readonly or header.get("fingerprint") == fingerprint(inputs + src.deps(ctx)):
+            if inputs and not ctx.readonly:
+                # The inputs cover everything discovery reads, so these docs are what the current packs give even when
+                # the packs' identity moved for another reason (a tuxmine config file): record that identity.
+                ident, _ = pack_identity(ctx)
+                if ident and header.get("pack") != ident["fingerprint"]:
+                    header = dict(header, pack=ident["fingerprint"], pack_label=ident["label"])
+                    write_jsonl(cache, header, cached)
+            ctx.note_extracted(kind, header)
             return cached
     if ctx.readonly or not inputs:
+        if cached is not None:
+            ctx.note_extracted(kind, header)
         return cached or []
     t0 = time.time()
+    before, _ = pack_identity(ctx)
     docs = list(src.discover(ctx))
     if not docs and cached:
         log("%s: extraction found nothing; keeping the %d cached docs" % (kind, len(cached)))
+        ctx.note_extracted(kind, header)
         return cached
+    # Claims only packs that were the same before and after discovery; a pack changing mid-extraction claims none.
+    after, _ = pack_identity(ctx)
+    ident = before if before == after else None
     # Fingerprinted after discovery: discovering can refresh the derived files (the lang cache, gregtech.json).
-    write_jsonl(cache, {"kind": kind, "fingerprint": fingerprint(src.inputs(ctx) + src.deps(ctx)),
-                        "extracted_at": int(time.time()), "docs": len(docs)}, docs)
+    header = {"kind": kind, "fingerprint": fingerprint(src.inputs(ctx) + src.deps(ctx)),
+              "extracted_at": int(time.time()), "docs": len(docs),
+              "pack": ident and ident["fingerprint"], "pack_label": ident and ident["label"]}
+    write_jsonl(cache, header, docs)
+    ctx.note_extracted(kind, header)
     log("%s: extracted %d docs in %.1fs" % (kind, len(docs), time.time() - t0))
     return docs
 
@@ -566,6 +743,7 @@ def corpus_chunks(ctx, kinds=None, log=lambda s: None):
     """Chunks of every kind, in the profile's order. lang loads first and item names are rebuilt for each pass, so
     quests and guide pages re-rendered in a long-lived process use the current names, not those of its first pass."""
     ctx._names = None
+    ctx.extracted = {}
     kinds = list(kinds or PROFILES[DEFAULT_PROFILE]["kinds"])
     by_kind = {}
     for kind in sorted(kinds, key=lambda k: k != "lang"):
@@ -945,7 +1123,44 @@ def guide_archives(ctx):
 
 
 def guide_inputs(ctx):
-    return guide_archives(ctx) + ctx.jars()
+    return guide_archives(ctx) + ctx.jars() + ctx.extra_inputs()
+
+
+MODID = re.compile(r'"modid"\s*:\s*"([^"]+)"')
+
+
+def jar_modids(path):
+    """The mod ids a jar's mcmod.info declares, lowercased. The jar is only read as a zip."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            if "mcmod.info" not in z.namelist():
+                return set()
+            return {m.lower() for m in MODID.findall(z.read("mcmod.info").decode("utf-8", "replace"))}
+    except (zipfile.BadZipFile, OSError, KeyError):
+        return set()
+
+
+def mod_jars(ctx):
+    """The jars the jar-reading sources read: [(path, extra)], the GTNH pack's first (extra None), then the tuxmine
+    packs' (extra = {"pack": "tuxmine server+client", "jar": name}, merged into each doc's meta). A tuxmine jar
+    replaces a GTNH one with the same file name or a shared mod id (our JourneyMap Unlimited over GTNH's fairplay
+    JourneyMap), so a mod is never read twice. Tuxmine URL mods not downloaded yet are skipped; their fingerprint
+    token says "missing", and pack_identity() refuses to stamp such a corpus."""
+    extras = [e for e in ctx.extra_jars() if e["path"]]
+    if not extras:
+        return [(p, None) for p in ctx.jars()]
+    names = {Path(e["path"]).name.lower() for e in extras} | {e["name"].lower() for e in extras}
+    ids = set().union(*(jar_modids(e["path"]) for e in extras))
+    out = [(p, None) for p in ctx.jars() if p.name.lower() not in names and not (jar_modids(p) & ids)]
+    for e in extras:
+        out.append((Path(e["path"]), {"pack": "tuxmine " + "+".join(e["packs"]), "jar": e["name"]}))
+    return out
+
+
+def replaced_jars(ctx):
+    """The GTNH jars mod_jars() leaves out in favour of a tuxmine jar."""
+    kept = {p for p, extra in mod_jars(ctx) if extra is None}
+    return [p for p in ctx.jars() if p not in kept]
 
 
 def guide_pages(names_in_zip):
@@ -1041,11 +1256,14 @@ def guide_doc(ns, rel, raw, names, origin):
     return {"key": "guide:%s/%s" % (ns, rel), "title": "%s guide: %s" % (ns, title), "text": text, "meta": out}
 
 
-@source("guide", guide_inputs, cache=True, deps=quest_name_inputs, doc="GuideNH pages (DefaultGuide.zip, resource packs, mod jars).")
+@source("guide", guide_inputs, cache=True, deps=quest_name_inputs,
+        doc="GuideNH pages (DefaultGuide.zip, resource packs, mod jars, the tuxmine packs' jars).")
 def discover_guides(ctx):
     names = ctx.names()
     seen = set()
-    for path in guide_archives(ctx) + ctx.jars():
+    jars = mod_jars(ctx)
+    # Resource packs first (they override jars in game), then our tuxmine jars, which win over the GTNH pack's.
+    for path, extra in [(p, None) for p in guide_archives(ctx)] + [j for j in jars if j[1]] + [j for j in jars if not j[1]]:
         try:
             z = zipfile.ZipFile(path)
         except (zipfile.BadZipFile, OSError):
@@ -1060,7 +1278,10 @@ def discover_guides(ctx):
                     continue
                 seen.add((ns, rel))
                 raw = z.read(name).decode("utf-8", "replace")
-                yield guide_doc(ns, rel, raw, names, path.name)
+                doc = guide_doc(ns, rel, raw, names, path.name)
+                if extra:
+                    doc["meta"].update(extra)
+                yield doc
 
 
 # lang: en_US.lang from every mod jar (and vanilla's from the server jar), plus GregTech's markdown multiblock
@@ -1091,7 +1312,7 @@ def lang_corpus_extra(ctx):
 
 
 def lang_inputs(ctx):
-    return ctx.jars() + lang_pack_extra(ctx)
+    return ctx.jars() + lang_pack_extra(ctx) + ctx.extra_inputs()
 
 
 def clean_lang(text):
@@ -1110,31 +1331,39 @@ def clean_tooltip(md):
     return re.sub(r"[{}]", "", md).strip()
 
 
-@source("lang", lang_inputs, cache=True, deps=lang_corpus_extra, doc="en_US.lang player text from every jar, split per mod by size.")
+@source("lang", lang_inputs, cache=True, deps=lang_corpus_extra,
+        doc="en_US.lang player text from every jar (the tuxmine packs' too), split per mod by size.")
 def discover_lang(ctx):
-    by_ns = {}
-    for path in ctx.jars() + [p for p in lang_extra(ctx) if p.suffix == ".jar"]:
+    by_ns, tooltips = {}, set()
+    for path, extra in mod_jars(ctx) + [(p, None) for p in lang_extra(ctx) if p.suffix == ".jar"]:
         try:
             z = zipfile.ZipFile(path)
         except (zipfile.BadZipFile, OSError):
             continue
+        jar = extra["jar"] if extra else path.name
         with z:
             for name in z.namelist():
                 m = LANG_PATH.search(name)
                 if m:
                     text = clean_lang(z.read(name).decode("utf-8", "replace"))
                     if text:
-                        by_ns.setdefault(m.group(1), []).append((path.name, text))
+                        by_ns.setdefault(m.group(1), []).append((jar, text, extra))
                     continue
                 m = TOOLTIP_PATH.match(name)
-                if m:
+                if m and m.groups() not in tooltips:
+                    tooltips.add(m.groups())
+                    meta = {"mod": m.group(1), "jar": jar, "format": "md"}
                     yield {"key": "lang:%s/tooltip/%s" % m.groups(), "title": "%s multiblock tooltip: %s" % (m.group(1), m.group(2)),
-                           "text": clean_tooltip(z.read(name).decode("utf-8", "replace")),
-                           "meta": {"mod": m.group(1), "jar": path.name, "format": "md"}}
+                           "text": clean_tooltip(z.read(name).decode("utf-8", "replace")), "meta": dict(meta, **(extra or {}))}
     for ns in sorted(by_ns):
-        for jar, text in by_ns[ns]:
-            key = "lang:" + ns if len(by_ns[ns]) == 1 else "lang:%s@%s" % (ns, jar)
-            yield {"key": key, "title": "%s en_US.lang" % ns, "text": text, "meta": {"mod": ns, "jar": jar, "format": "lang"}}
+        # Keys of the GTNH pack's docs depend only on the GTNH jars, so adding our jars never renames them; one of
+        # ours is lang:<ns> when it alone has that namespace, else lang:<ns>@<jar>.
+        gtnh = sum(1 for _, _, extra in by_ns[ns] if not extra)
+        for jar, text, extra in by_ns[ns]:
+            alone = gtnh == 1 if not extra else len(by_ns[ns]) == 1
+            key = "lang:" + ns if alone else "lang:%s@%s" % (ns, jar)
+            meta = {"mod": ns, "jar": jar, "format": "lang"}
+            yield {"key": key, "title": "%s en_US.lang" % ns, "text": text, "meta": dict(meta, **(extra or {}))}
     for path in lang_extra(ctx):
         if path.suffix == ".lang":
             text = clean_lang("\n".join("%s=%s" % kv for kv in parse_lang(path.read_text(encoding="utf-8", errors="replace")).items()))
@@ -1443,8 +1672,10 @@ def build(ctx, embedder, path, profile=DEFAULT_PROFILE, chunks=None, log=lambda 
         if saved:
             log("resuming with %d vectors from %s" % (len(saved), partial_path(path).name))
         known.update(saved)
+        extracted = {}
         if chunks is None:
             chunks = corpus_chunks(ctx, PROFILES[profile]["kinds"], log)
+            extracted = ctx.extracted  # which packs each kind's docs came from (only known for chunks built here)
         need, seen = [], set()
         for c in chunks:
             if c["id"] not in known and c["id"] not in seen:
@@ -1465,7 +1696,12 @@ def build(ctx, embedder, path, profile=DEFAULT_PROFILE, chunks=None, log=lambda 
             "chunks": len(chunks), "sources": len({c["source"] for c in chunks}), "kinds": count_by_kind(chunks),
             "embedded": len(need), "cost": round(getattr(embedder, "cost", 0.0), 6),
             "seconds": round(time.time() - t0, 1),
+            # The packstate fingerprint each pack kind's docs were extracted from (None: unknown or not a full pack).
+            "corpus_pack": {k: (extracted.get(k) or {}).get("pack") for k in pack_kinds(profile)},
         }
+        labels = {(extracted.get(k) or {}).get("pack_label") for k in pack_kinds(profile)}
+        if len(labels) == 1 and None not in labels:
+            meta["corpus_pack_label"] = labels.pop()
         index = {"vectors": vectors, "chunks": chunks, "meta": meta}
         save_index(path, chunks, vectors, meta)
         if partial_path(path).exists():
@@ -1498,7 +1734,7 @@ def search(index, qvec, k=8, kind=None, per_source=3):
     return [dict(chunks[i], score=float(scores[i])) for i in picked]
 
 
-ID_FIELDS = ("quest_id", "quest_ids", "item_ids", "page", "url", "path", "mod")
+ID_FIELDS = ("quest_id", "quest_ids", "item_ids", "page", "url", "path", "mod", "pack")
 
 
 def hit_ids(meta, limit=8):
@@ -1510,6 +1746,8 @@ def hit_ids(meta, limit=8):
         if isinstance(v, list):
             v = ", ".join(v[:limit]) + (" (+%d more)" % (len(v) - limit) if len(v) > limit else "")
         parts.append("%s: %s" % (k, v))
+    if meta.get("pack") and meta.get("jar"):  # our extra mods: name the jar a hit came from
+        parts.append("jar: %s" % meta["jar"])
     return " · ".join(parts)
 
 

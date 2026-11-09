@@ -4,7 +4,7 @@ Gives Dave a `gtnh_search` tool that searches GT New Horizons knowledge by meani
 
 - the 2.9.0 quest book: one passage per quest, with its quest line, tasks, rewards and prerequisites;
 - the GuideNH guide pages: GregTech machines and multiblocks, power, overclocking, AE2, Thaumcraft;
-- the `en_US.lang` player text of every mod: item and machine names, tooltips, structure hints;
+- the `en_US.lang` player text of every mod: item and machine names, tooltips, structure hints, including our own extra mods from the tuxmine packs (GregGuns, EZStorage, Lost Cities, Qz-Miner, …);
 - an offline copy of wiki.gtnewhorizons.com, from Miraheze's archive.org backups and refreshed weekly (see [The wiki](#the-wiki));
 - Dave's own saved answers (`playbook`) and server notes (`memory`);
 - item cards, once the recipe database exists.
@@ -22,16 +22,22 @@ The code is ported from GregGuns' `tools/semantic-search` (same owner, itself po
   | `kind` | Read from | One document = |
   |---|---|---|
   | `quest` | `config/betterquesting/DefaultQuests/` in the pack. In 2.9.0 the quest text is inline in each quest's JSON (`name:8`, `desc:8`), not in a lang file. Chapters come from `QuestLines/`. | One quest: quest line, title, description, tasks with item names, rewards, prerequisites and the quests it unlocks. Metadata: `quest_id` (BetterQuesting's base64 ID, as in the file names), `item_ids`. |
-  | `guide` | `config/guidenh/DefaultGuide.zip` (the GTNH Guide Pack 0.1.26 resource pack, CC BY-NC-SA 4.0), plus any `assets/<ns>/guidenh/_en_us/*.md` in mod jars or `resourcepacks/`. | One page. Front matter gives `item_ids` and `quest_ids`; item tags become item names; 3D scenes and recipe widgets are dropped. Split at headings. |
-  | `lang` | `assets/<ns>/lang/en_US.lang` in every jar and in the vanilla server jar, GregTech's multiblock tooltip Markdown (`assets/gregtech/lang/en_US/tooltip/*.md`), and a runtime `GregTech.lang` when one is in the pack directory or `data/corpus/lang/extra/`. | One mod's entries, split by size; one tooltip file. |
+  | `guide` | `config/guidenh/DefaultGuide.zip` (the GTNH Guide Pack 0.1.26 resource pack, CC BY-NC-SA 4.0), plus any `assets/<ns>/guidenh/_en_us/*.md` in mod jars (the tuxmine packs' jars too, e.g. GregGuns' guide) or `resourcepacks/`. | One page. Front matter gives `item_ids` and `quest_ids`; item tags become item names; 3D scenes and recipe widgets are dropped. Split at headings. |
+  | `lang` | `assets/<ns>/lang/en_US.lang` in every jar (the GTNH pack's and the tuxmine packs') and in the vanilla server jar, GregTech's multiblock tooltip Markdown (`assets/gregtech/lang/en_US/tooltip/*.md`), and a runtime `GregTech.lang` when one is in the pack directory or `data/corpus/lang/extra/`. | One mod's entries, split by size; one tooltip file. |
   | `wiki` | `data/corpus/wiki/`, written by `mirror_wiki.py --from-dump` and `update_wiki.py`. | One page, split at section headings, keeping the heading path. |
   | `item` | Stub. Will read `data/recipes.sqlite` (Stage 2 of the plan). | One item or fluid card, keyed `item:<mod:reg:damage>`: name, aliases, ore dictionary names, mod, tooltip, the machine types that make it and its top uses, with `item_ids` in metadata. Returns nothing until the database exists. |
   | `playbook` | `data/memory/playbook/*.md` | One saved answer: front matter (title, status, pack, asked-by, …) plus body. |
   | `memory` | `data/memory/server/` and `data/memory/lessons/` | One note. |
 
   `data/memory/players/` is never indexed. Memories whose `status` is `archived` or `superseded` are skipped.
+- **Our extra mods.** `guide` and `lang` also read every jar of the two tuxmine packwiz packs (`tuxmine/server`, `tuxmine/client`, client-only jars included), as [`tools/packstate.py`](../packstate.py) lists them: jar files in the packs, and URL mods from its download cache (`.work/tuxmine-jars`, filled and sha256-checked by `index.py --extract`).
+  - Jars are untrusted data and are only ever opened as zip files.
+  - A tuxmine jar replaces a GTNH pack jar with the same file name or a shared `modid` in `mcmod.info`, so a mod is never indexed twice and ours wins (`index.py --extract` lists any it replaced).
+  - Their documents carry `pack` (`tuxmine server`, `tuxmine client` or `tuxmine server+client`) and `jar` in their metadata, and a hit shows both. GTNH documents keep their keys; one of ours is `lang:<ns>` unless a GTNH jar has the same namespace, then `lang:<ns>@<jar>`.
+  - Without a GTNH pack or a `tuxmine/` directory (the image), none of this runs.
 - **Extraction cache.** `quest`, `guide` and `lang` documents are saved to `data/corpus/<kind>/docs.jsonl`, keyed on a fingerprint of their input files, so a refresh re-reads the pack only when it changed.
-  - The fingerprint covers the pack files and the derived files the text depends on: the lang cache, `items.tsv`, GregTech's source in `gtnh-src/`, and `data/corpus/lang/extra/`.
+  - The fingerprint covers the pack files, each tuxmine jar's name and sha256 (and whether its file is present), and the derived files the text depends on: the lang cache, `items.tsv`, GregTech's source in `gtnh-src/`, and `data/corpus/lang/extra/`.
+  - The header line of each `docs.jsonl` also records the packs it was extracted from: `pack` (packstate's `corpus` fingerprint) and `pack_label` (`GTNH 2.9.0, tuxmine server 0.1.28, client 0.1.26`). It is left empty when that can't be vouched for: a tuxmine URL mod not downloaded, packstate unavailable, or the packs changing during the extraction.
   - Without the pack (the image, the volume), the cache is used as is and is never re-extracted from fallbacks such as `gtnh-src/config`.
   - An extraction that finds nothing never replaces a non-empty cache.
   - A refresh loads `lang` first and rebuilds item names on every pass, so a long-running server renders with current names.
@@ -50,6 +56,8 @@ The code is ported from GregGuns' `tools/semantic-search` (same owner, itself po
 - **Index.** `data/index/<profile>__<model>.npz`: git-ignored, written atomically (unique temporary file, fsync, rename), with a lock file so two builds never run at once. Vectors are normalized, so a search is one matrix product.
   - A build saves the vectors it has paid for every 1,024 chunks to `<index>.partial.npz`; after a failure, the next build of the same model starts from them.
   - An unreadable index file is moved to `<index>.npz.corrupt` and rebuilt. Until then the server answers as if there were no index.
+  - Its metadata records `corpus_pack`, the packs each pack kind's documents came from (from the `docs.jsonl` headers), and `gtnh_search_status` shows them.
+- **Freshness.** The corpus and the index are pack-derived data, tracked by [`tools/packstate.py`](../packstate.py) as the components `corpus` and `index` (stamps in `data/packstate/`). See [Keeping it fresh](#keeping-it-fresh).
 - **Ranking.** Cosine similarity, at most three chunks per document. In a mixed search, `lang` gets at most a third of the slots, because its long key lists match item names strongly and would crowd out prose. Use `kind` to search one kind only.
 
 ## Setup
@@ -92,6 +100,9 @@ The image bakes the corpus and index in read-only as a **seed**. At run time the
 | `GTNH_SEARCH_STATE` | unset | The writable volume. When set, the live corpus and index are `<state>/corpus` and `<state>/index`, and every write goes there. |
 | `GTNH_MEMORY_DIR` | `<root>/data/memory` | Dave's memories (written by `dave-memory`, only read here). |
 | `GTNH_PACK_DIR` | newest `<root>/.work/gtnh-*/pack` | The extracted server pack; absent in the image. |
+| `TUXMINE_DIR` | `<root>/tuxmine` | Our packwiz packs (`server/`, `client/`); absent in the image. |
+| `TUXMINE_JAR_CACHE` | `<root>/.work/tuxmine-jars` | Where the tuxmine packs' URL mods are downloaded to. |
+| `DAVE_AGENT_ROOT` | `GTNH_SEARCH_ROOT`, else the repository | packstate's root, for its stamps (`data/packstate/`, or `PACKSTATE_DIR`). `index.py` sets it from `GTNH_SEARCH_ROOT` when unset; packstate must see the same pack and `tuxmine/` as the corpus, or nothing is stamped. |
 | `GTNH_SEARCH_READONLY` | off | `1`: serve the index as built and write nothing. |
 
 - **Seeding.** `index.py --seed` copies the seed corpus and index into the state directory when it lacks them, or when its copy came from a different image. The image is identified by a stamp: the seed files' paths, sizes and mtimes, recorded in `<state>/seed.json`. It runs under `<state>/jobs.lock` and swaps each directory in whole. `server.py` also seeds at start, so forgetting the entrypoint step is harmless. `--seed` also creates the volume's living wiki (`<state>/wiki-git`, see [The wiki](#the-wiki)) from the baked wiki, **only when the volume has none**. After that, a re-seed keeps the volume's `corpus/wiki`: the living wiki is the source of truth, and a newer dump baked into an image is merged by `update_wiki.py`, never copied over it.
@@ -111,16 +122,17 @@ The image bakes the corpus and index in read-only as a **seed**. At run time the
 
 | Tool | What it does |
 |---|---|
-| `gtnh_search` | Takes `query` (natural language), plus optional `k` (1–25, default 8) and `kind` (`any`, `quest`, `guide`, `wiki`, `item`, `lang`, `playbook`, `memory`). Each hit shows `[n] kind · title · score`, its source (`quest:<id>`, `guide:<ns>/<page>.md:<lines>`, `lang:<mod>:<lines>`, …), any IDs (`quest_id`, `quest_ids`, `item_ids`, `page`) and a snippet of up to 1,500 characters. |
-| `gtnh_search_status` | Chunk counts per kind, the model, when and from which pack it was built, and whether a refresh is running or disabled. |
+| `gtnh_search` | Takes `query` (natural language), plus optional `k` (1–25, default 8) and `kind` (`any`, `quest`, `guide`, `wiki`, `item`, `lang`, `playbook`, `memory`). Each hit shows `[n] kind · title · score`, its source (`quest:<id>`, `guide:<ns>/<page>.md:<lines>`, `lang:<mod>:<lines>`, …), any IDs (`quest_id`, `quest_ids`, `item_ids`, `page`, and for our extra mods `pack` and `jar`) and a snippet of up to 1,500 characters. |
+| `gtnh_search_status` | Chunk counts per kind, the model, when and from which pack it was built (and which packs its corpus was extracted from), and whether a refresh is running or disabled. |
 | `gtnh_reindex` | Refreshes now and waits for it, for example right after a playbook answer is saved. |
 
 ## Command line
 
 ```sh
-python3 -I tools/gtnh-search/index.py --extract        # re-read the pack into data/corpus/ (no API calls; waits for a running build)
+python3 -I tools/gtnh-search/index.py --extract        # re-read the packs into data/corpus/ and stamp "corpus" (no API calls; waits for a running build)
 python3 -I tools/gtnh-search/index.py --stats          # chunks and characters per kind, estimated cost (no API calls)
-python3 -I tools/gtnh-search/index.py                  # incremental build
+python3 -I tools/gtnh-search/index.py --check          # exit 1 unless the corpus and index come from the current packs (no API calls)
+python3 -I tools/gtnh-search/index.py                  # incremental build; stamps "corpus" and "index"
 python3 -I tools/gtnh-search/index.py --query "best nitrogen source at HV" -k 5 --kind quest
 python3 -I tools/gtnh-search/eval.py --check           # every expected eval hit exists in the corpus (no API calls)
 python3 -I tools/gtnh-search/eval.py --dry-run         # per-model eval cost (no API calls)
@@ -130,6 +142,32 @@ python3 -I tools/gtnh-search/update_wiki.py --check    # is there a newer wiki d
 python3 -I tools/gtnh-search/mirror_wiki.py --from-dump .work/wiki-dump/gtnhwiki-20260904.xml.gz
 python3 -I tools/gtnh-search/test_semsearch.py         # offline tests (no API calls)
 ```
+
+### Keeping it fresh
+
+The corpus and its embeddings must never silently lag behind the packs. After any change to the GTNH pack or a tuxmine pack (a new GTNH release, a jar added or updated, `packwiz refresh`), on the dev machine with the packs present:
+
+```sh
+python3 -I tools/gtnh-search/index.py --extract   # 1. downloads missing tuxmine URL mods, re-extracts quest/guide/lang, stamps "corpus"
+python3 -I tools/gtnh-search/index.py             # 2. embeds what changed (OpenRouter), stamps "corpus" and "index"
+python3 -I tools/gtnh-search/index.py --check     # 3. or: python3 -I tools/packstate.py check corpus index
+```
+
+Then commit `data/corpus/` and rebuild the image, so the baked seed matches.
+
+| Command | Exit 0 | Exit 1 | Exit 2 |
+|---|---|---|---|
+| `--extract` | extracted and stamped; or extracted with no pack here (nothing to stamp) | read-only, a tuxmine jar could not be fetched, or not stamped (the reason is printed) | |
+| (build) | built and stamped; or built with no pack here | build failed or skipped, or not stamped | no `OPENROUTER_API_KEY` |
+| `--check` | corpus and index are current | anything stale, unstamped or unknown (each problem printed as `STALE …`) | |
+
+What makes a stamp truthful:
+
+- `corpus` is stamped only when every pack kind (`quest`, `guide`, `lang`) was extracted from the current packs, with every tuxmine jar read. A URL mod that is not downloaded, or packs that changed during the run, leave it unstamped.
+- `index` is stamped only by a full build, and only when the documents it embedded all record the current packs. An index built from an older corpus can never be stamped, and a stamp that would name packs other than the ones the data came from is removed.
+- `--check` compares packstate's stamps with the current packs, and also reads what the data itself records: each `docs.jsonl` header and the index's `corpus_pack`.
+
+In the image there is no pack and no `tuxmine/`. Nothing is fetched or stamped there; the server seeds and refreshes playbook and memory embeddings, and the weekly wiki job runs, exactly as before. Its `gtnh_search_status` shows which packs the baked corpus came from.
 
 ## Eval
 
@@ -203,6 +241,7 @@ python3 -I tools/living-wiki/living_wiki.py export      # git bundle of the livi
 
 - Quests and guide pages can lag behind the pack. Check numbers against the recipe tools before quoting them.
 - About a third of quest task items show a raw ID until `data/corpus/names/items.tsv` exists.
+- Our extra mods' items resolve through their lang keys (GregGuns' guns, gear and ammo, EZStorage's blocks), but GregGuns' GregTech machines (`gregtech:gt.blockmachines:201xx`) keep their raw ID: their meta IDs are in GregGuns' source, which `gtnh-src/` doesn't hold. `items.tsv` from the recipe database will fix them.
 - Scores compare well within one kind; across kinds they are only a rough guide.
 - Changing a profile's model starts a new index file and a full re-embed.
 - After changing an extractor, bump `EXTRACT_VERSION` in `semsearch.py` or run `index.py --extract`, so the cached documents are rebuilt.
