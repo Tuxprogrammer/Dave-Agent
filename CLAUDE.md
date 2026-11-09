@@ -89,6 +89,10 @@ The plan is in `docs/plans/recipe-knowledge.md`.
   - **GalaxySpace:** the checkout is the author's diverged line, so use the decompile for GTNH behaviour.
   - **Witchery:** its "source" is a decompiled dump.
   - **Closed source, decomp only:** Thaumcraft 4, IC2, Extra Utilities and BiblioCraft (Thaumcraft and IC2 have API-only source).
+- **Tuxmine extras.** Every jar the tuxmine packs add (GregGuns, Lost Cities, EZStorage, Qz-*, WorldEdit, DiscordIntegration, DaveBridge itself, …) also has its exact source in `source/`, made by `tools/decomp/tuxmine_extras.py` from the mapping `tools/decomp/tuxmine-extras.json`.
+  - `source-index.json` rows carry `"tuxmineExtra": true`; SOURCE-INDEX.md and INDEX.md each have a generated "Tuxmine extras" block.
+  - `mods/<dir>/` holds only the shipped jars' resources (mcmod.info, lang, mixin configs). The exception is DiscordIntegration, whose `chikachi.discord` classes are decompiled.
+  - When a pack adds or updates a jar, rerun the tool: `DAVE_AGENT_ROOT=<checkout> python3 -I tools/decomp/tuxmine_extras.py`. It fails on any unmapped jar, so map new ones first. `make_index.py` keeps both blocks.
 - **Check the license before copying any code into our mods.** It's in `source-index.json`; 18 repos have no license and 6 are All Rights Reserved.
 - **Exclude `gtnh-src/_decompiled/` from grep and search.** It holds superseded decompiles of mods that now have real source, and duplicates every hit.
 - **Vanilla and Forge** are decompiled with MCP names in `gtnh-src/minecraft/`.

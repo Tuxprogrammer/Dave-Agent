@@ -1,0 +1,161 @@
+{
+  "_doc": [
+    "Source mapping for every jar the tuxmine packs add on top of stock GTNH (read by tuxmine_extras.py).",
+    "Each entry matches jar file names with the regex `jar` (full match). Its named group `version` is the version",
+    "the tag is derived from. Every tuxmine jar must match exactly one entry, or the tool fails.",
+    "kind: git        checkout of `repo` at `tag` (a template over the jar version, checked with git ls-remote),",
+    "                 or at a pinned `commit` on `branch`, which is only valid for `verified_version`.",
+    "      this-repo  a snapshot of `subdir` of this repository at the commit that built the shipped version.",
+    "      covered    already in gtnh-src/source/ as the GTNH manifest row with modId `covered_modId`; its `ref`",
+    "                 must equal the jar version.",
+    "      skip       not sourced on purpose; `reason` is required and is printed in the indexes.",
+    "Optional: dir (checkout dir name, default: the repo name), name, ours (one of the owner's own mods),",
+    "submodules {path: {repo, branch, commit, note}}, bundles [{name, repo, tag, runtimePackage, note}],",
+    "decompile {include: [class path prefixes]}, notes, generated [classes the build generates, so they are",
+    "not in the source; the generateGradleTokenClass of gradle.properties is detected without this]."
+  ],
+  "mods": [
+    {
+      "jar": "gregguns-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/Tuxprogrammer/GregGuns",
+      "tag": "{version}",
+      "ours": true
+    },
+    {
+      "jar": "lostcitiesnh-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/Tuxprogrammer/LostCities",
+      "tag": "{version}",
+      "ours": true,
+      "notes": "Lost Cities: New Horizons, the owner's 1.7.10 port of McJty's Lost Cities."
+    },
+    {
+      "jar": "fortunateone-(?P<version>v.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/Tuxprogrammer/Fortunate-One",
+      "tag": "{version}",
+      "ours": true
+    },
+    {
+      "jar": "ezstorage-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/LITW-Refined/EZStorage",
+      "tag": "{version}"
+    },
+    {
+      "jar": "gtnhrates-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/Sladki/GTNHRates",
+      "tag": "{version}",
+      "notes": "Version is <mod version>-<GTNH line>; the tag carries both."
+    },
+    {
+      "jar": "qz_miner-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/QuanhuZeYu/Qz-Miner",
+      "tag": "{version}",
+      "generated": [
+        "club.heiqi.qz_miner.NetworkVersionRange"
+      ]
+    },
+    {
+      "jar": "qz_uilib-(?P<version>\\d.*)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/QuanhuZeYu/Qz-UILib",
+      "tag": "{version}",
+      "notes": "The Forge 1.7.10 host mod. The core-java8 and font-adapter-java8 jars next to it are separate libraries from the Qz-UILib-Core and Qz-UILib-Platform repos (same version tag)."
+    },
+    {
+      "jar": "qz_uilib-core-java8-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/QuanhuZeYu/Qz-UILib-Core",
+      "tag": "{version}",
+      "name": "Qz UILib core (Java 8 library jar)",
+      "notes": "Platform-free UI core library (Maven asia.quanhuzeyu.uilib:core:<version>:java8), no mcmod.info. Qz-UILib pulls it in from Maven; its source is the separate Qz-UILib-Core repo at the same version tag."
+    },
+    {
+      "jar": "qz_uilib-font-adapter-java8-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/QuanhuZeYu/Qz-UILib-Platform",
+      "tag": "{version}",
+      "name": "Qz UILib font adapter (Java 8 library jar)",
+      "notes": "Font adapter library (Maven asia.quanhuzeyu.uilib:font-adapter:<version>:java8), no mcmod.info. Its source is the Qz-UILib-Platform repo (font, render, media and desktop adapters) at the same version tag."
+    },
+    {
+      "jar": "qz_uilib_compat-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/QuanhuZeYu/Qz-UILib-Compat",
+      "tag": "{version}",
+      "name": "Qz UILib Compat"
+    },
+    {
+      "jar": "worldedit-(?P<version>v.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/GTNewHorizons/worldedit-gtnh",
+      "tag": "{version}",
+      "notes": "GTNH's WorldEdit fork for 1.7.10 (com.sk89q.worldedit)."
+    },
+    {
+      "jar": "davebridge-(?P<version>.+)\\.jar",
+      "kind": "this-repo",
+      "subdir": "DaveBridge",
+      "dir": "DaveBridge",
+      "ours": true,
+      "notes": "Dave's own mod, from this repository. The release commit is found from a davebridge-v<version> tag, else the commit whose subject names \"DaveBridge <version>\", cross-checked against the commit that added the jar to a tuxmine pack, and verified against the jar's class list and lang file."
+    },
+    {
+      "jar": "DiscordIntegrationUnoffical-mc1\\.7\\.10-(?P<version>.+)\\.jar",
+      "kind": "git",
+      "repo": "https://github.com/Miradae/DiscordIntegration",
+      "branch": "v3/mc1.7",
+      "commit": "4fde36649eec7f3dfcc8f3b800c786d4c9e395e2",
+      "verified_version": "3.1.1_3.8.3_464",
+      "dir": "DiscordIntegration",
+      "name": "DiscordIntegration (unofficial 1.7.10 build)",
+      "match": "exact",
+      "submodules": {
+        "core": {
+          "repo": "https://github.com/Chikachi/DiscordIntegrationCore",
+          "branch": "master",
+          "commit": "54725b7d293f659b4067a1b0869a7a9df7d0db25",
+          "match": "nearest",
+          "note": "The fork pins core at c7385b932d58fffac6c2ad82fbbfa9e694d38227, which was never published (not in Chikachi/DiscordIntegrationCore or any fork of it). This is upstream master (code last changed 2018-06-29); its 61 top-level classes match the jar's class list exactly, but the bodies may differ where the fork adapted core to JDA 3.8.3. The decompile in mods/ is authoritative for chikachi.discord.core."
+        }
+      },
+      "bundles": [
+        {
+          "name": "JDA",
+          "repo": "https://github.com/DV8FromTheWorld/JDA",
+          "tag": "v3.8.3",
+          "runtimePackage": "chikachi.discord.repack.net.dv8tion.jda",
+          "note": "Java Discord API 3.8.3 (CI build 464), shaded into the DiscordIntegration jar and relocated from net.dv8tion.jda to chikachi.discord.repack.net.dv8tion.jda. Use it to read the message-sending API (TextChannel.sendMessage(...).queue())."
+        }
+      ],
+      "decompile": {
+        "include": [
+          "chikachi/discord/"
+        ]
+      },
+      "notes": "Unofficial 1.7.10 build 3.1.1 of Chikachi's DiscordIntegration by Miradae (co-author in mcmod.info), CurseForge file 3147365. Miradae's fork, branch v3/mc1.7, head commit 4fde366 (2020-12-23, \"updated jda to 3.8.3_464\") has modVersion 3.1.1, jdaVersion 3.8.3 and jdaJob 464 in build.gradle, which is exactly the jar version. Chikachi's own 1.7 line stops at 3.0.5. The mod's own classes (chikachi.discord.*, chikachi.discord.core.*) were also decompiled into mods/ because the core submodule commit is unpublished. Sending to Discord: chikachi.discord.core.DiscordClient (getInstance(), broadcast(...)) and the JDA bundle.",
+      "searched": [
+        "mcmod.info url https://discordintegration.net (project site, no source link for this build)",
+        "github.com/Chikachi/DiscordIntegration (tags up to 2.1.0-MC1.7.10; branch v3/mc1.7 ends at 3.0.5, 2018-03-18)",
+        "forks of Chikachi/DiscordIntegration: Miradae (v3/mc1.7 = 3.1.1_3.8.3_464, FOUND), BallOfEnergy1 (v4/mc1.7 differs, later), TimeConqueror (v5/mc-1.7 rewrite), obsoletelabs (mirror)",
+        "github.com/Chikachi/DiscordIntegrationCore and its 12 forks (core commit c7385b9 not published anywhere)",
+        "GitHub repo search \"DiscordIntegration 1.7.10\" (Dasfaust/DiscordIntegrationRetro, unilock/DCIntegration-1.7.10: different mods)"
+      ]
+    },
+    {
+      "jar": "journeymap-1\\.7\\.10-(?P<version>[\\d.]+)-unlimited\\.jar",
+      "kind": "covered",
+      "covered_modId": "journeymap",
+      "notes": "Our packs ship the \"unlimited\" build flavour of JourneyMap 5.2.23 on both client and server (stock GTNH ships the fairplay flavour, client only). Same source: gtnh-src/source/journeymap-legacy/; its shipped mixin configs and lang files are in gtnh-src/mods/journeymap/."
+    },
+    {
+      "jar": "WorldEditCuiFe-.*\\.jar",
+      "kind": "skip",
+      "reason": "Client-only render overlay (WorldEdit CUI Forge Edition): draws WorldEdit selections on the player's screen, never runs on the server and has no API Dave scripts against."
+    }
+  ]
+}

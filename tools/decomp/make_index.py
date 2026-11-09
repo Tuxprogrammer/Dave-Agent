@@ -124,8 +124,14 @@ def main(cfg_path):
                '+unimixins-all-1.7.10-0.3.1.jar': 'SpongePowered Mixin + MixinExtras framework and shaded libraries (3,621 classes); upstream LegacyModdingMC/UniMixins'}
     lines += ['', '## Skipped jars', ''] + ([f'- `{s}`: {reasons.get(s, "")}' for s in skipped] or ['- none'])
     lines += ['', '## Failed jars', ''] + ([f'- `{s}`' for s in failed] or ['- none'])
+    # Keep the "Tuxmine extras" block that tools/decomp/tuxmine_extras.py appends: regenerating the GTNH part must
+    # not drop it. Rerun tuxmine_extras.py after a pack update to refresh it.
+    extras = ''
+    if os.path.isfile(c['out']):
+        m = re.search(r'<!-- tuxmine-extras:begin -->.*?<!-- tuxmine-extras:end -->\n?', open(c['out']).read(), re.S)
+        extras = m.group(0) if m else ''
     with open(c['out'], 'w') as f:
-        f.write('\n'.join(lines) + '\n')
+        f.write('\n'.join(lines) + '\n' + ('\n' + extras if extras else ''))
     print(f'rows={len(rows)} skipped={len(skipped)} failed={len(failed)} no_hint={sum(1 for r in rows if not r[8])}')
 
 
