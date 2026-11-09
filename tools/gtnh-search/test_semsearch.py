@@ -11,6 +11,7 @@ import os
 import shutil
 import struct
 import base64
+import contextlib
 import sys
 import tempfile
 import threading
@@ -31,6 +32,7 @@ import server  # noqa: E402
 import mirror_wiki  # noqa: E402
 import eval as ev  # noqa: E402
 import update_wiki as uw  # noqa: E402
+import index as ix  # noqa: E402
 
 
 def no_network(*a, **k):
@@ -40,7 +42,8 @@ def no_network(*a, **k):
 urllib.request.urlopen = no_network
 # The tests set every path themselves; a developer's environment must not redirect them.
 for _var in ("GTNH_SEARCH_STATE", "GTNH_SEARCH_DATA", "GTNH_SEARCH_INDEX_DIR", "GTNH_SEARCH_READONLY", "GTNH_SEARCH_ROOT",
-             "GTNH_MEMORY_DIR", "GTNH_PACK_DIR", "OPENROUTER_API_KEY_FILE"):
+             "GTNH_MEMORY_DIR", "GTNH_PACK_DIR", "OPENROUTER_API_KEY_FILE", "DAVE_AGENT_ROOT", "TUXMINE_DIR",
+             "TUXMINE_JAR_CACHE", "PACKSTATE_DIR"):
     os.environ.pop(_var, None)
 
 
@@ -1054,6 +1057,146 @@ class FailureStageTest(unittest.TestCase):
         self.assertNotIn("unchanged", summary)
         self.assertIn("living wiki now holds " + NEW_ITEM, summary)
         self.assertIn("disk full", summary)
+
+
+def jar_bytes(files):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for name, text in files.items():
+            z.writestr(name, text)
+    return buf.getvalue()
+
+
+GUN_JAR = {"mcmod.info": '[{"modid": "gunmod", "name": "Gun Mod"}]',
+           "assets/gunmod/lang/en_US.lang": "item.gunmod.rifle.name=Plasma Rifle\n",
+           "assets/gunmod/guidenh/_en_us/guns.md": '# Guns\n\nThe <ItemLink id="gunmod:rifle" /> fires plasma bolts.\n'}
+
+
+class Tuxmine:
+    """Our packwiz packs on the fixture pack: gunmod-1.0.jar as a file in both packs, and a client URL mod (already
+    in the jar cache, so nothing is downloaded) that replaces the GTNH pack's fairplay JourneyMap by mod id."""
+
+    def __init__(self, f):
+        self.f, self.dir, self.cache = f, f.root / "tuxmine", f.root / ".work" / "tuxmine-jars"
+        with zipfile.ZipFile(f.ctx.pack / "mods" / "journeymap-fairplay.jar", "w") as z:
+            z.writestr("mcmod.info", '[{"modid": "journeymap"}]')
+            z.writestr("assets/journeymap/lang/en_US.lang", "jm.fairplay=Fairplay map without caves\n")
+        self.gun(GUN_JAR)
+        unlimited = jar_bytes({"mcmod.info": '[{"modid": "journeymap"}]',
+                               "assets/journeymap/lang/en_US.lang": "jm.unlimited=Unlimited map with caves\n"})
+        f.mkdir(self.cache)
+        (self.cache / "journeymap-unlimited.jar").write_bytes(unlimited)
+        f.write(self.dir / "client" / "mods" / "journeymap.pw.toml",
+                'name = "JourneyMap Unlimited"\nfilename = "journeymap-unlimited.jar"\nside = "client"\n\n[download]\n'
+                'url = "https://example.invalid/journeymap-unlimited.jar"\nhash-format = "sha256"\nhash = "%s"\n'
+                % hashlib.sha256(unlimited).hexdigest())
+        for side, files in (("server", ["mods/gunmod-1.0.jar"]), ("client", ["mods/gunmod-1.0.jar", "mods/journeymap.pw.toml"])):
+            f.write(self.dir / side / "index.toml", 'hash-format = "sha256"\n' + "".join(
+                '\n[[files]]\nfile = "%s"\nhash = "0"\n' % rel for rel in files))
+            self.version(side, "0.1.0", "hash-0")
+
+    def gun(self, files):
+        for side in ("server", "client"):
+            self.f.mkdir(self.dir / side / "mods")
+            (self.dir / side / "mods" / "gunmod-1.0.jar").write_bytes(jar_bytes(files))
+
+    def version(self, side, version, index_hash):
+        """What packwiz refresh does to pack.toml after any change in the pack."""
+        self.f.write(self.dir / side / "pack.toml", 'name = "tux-%s"\nversion = "%s"\n\n[index]\nfile = "index.toml"\n'
+                     'hash-format = "sha256"\nhash = "%s"\n' % (side, version, index_hash))
+
+
+def quiet(fn, *a):
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        return fn(*a)
+
+
+@unittest.skipIf(s.load_packstate() is None, "tools/packstate.py needs Python 3.11 or newer")
+class TuxmineTest(unittest.TestCase):
+    def docs(self, ctx, kind):
+        return {d["key"]: d for d in s.load_docs(ctx, kind)}
+
+    def test_extra_jars_join_lang_and_guide(self):
+        with Fixture() as f:
+            Tuxmine(f)
+            lang = self.docs(f.ctx, "lang")
+            gun = lang["lang:gunmod"]
+            self.assertIn("Plasma Rifle", gun["text"])
+            self.assertEqual((gun["meta"]["pack"], gun["meta"]["jar"]), ("tuxmine server+client", "gunmod-1.0.jar"))
+            # Our JourneyMap replaces GTNH's (same mod id): one doc, ours, under the plain key.
+            jm = lang["lang:journeymap"]
+            self.assertIn("Unlimited map", jm["text"])
+            self.assertEqual(jm["meta"]["pack"], "tuxmine client")
+            self.assertNotIn("Fairplay", json.dumps(lang))
+            self.assertEqual([p.name for p in s.replaced_jars(f.ctx)], ["journeymap-fairplay.jar"])
+            # GTNH docs keep their keys and carry no pack marker.
+            self.assertNotIn("pack", lang["lang:testmod"]["meta"])
+            guide = self.docs(f.ctx, "guide")["guide:gunmod/guns.md"]
+            self.assertIn("Plasma Rifle fires plasma bolts", guide["text"])
+            self.assertEqual(guide["meta"]["jar"], "gunmod-1.0.jar")
+            self.assertEqual(s.Names(f.ctx).item("gunmod:rifle"), "Plasma Rifle")
+            self.assertIn("jar: gunmod-1.0.jar", s.hit_ids(guide["meta"]))
+            self.assertNotIn("jar:", s.hit_ids(lang["lang:testmod"]["meta"]))
+
+    def test_changed_extra_jar_is_reextracted(self):
+        with Fixture() as f:
+            tux = Tuxmine(f)
+            self.assertIn("Plasma Rifle", self.docs(f.ctx, "lang")["lang:gunmod"]["text"])
+            tux.gun(dict(GUN_JAR, **{"assets/gunmod/lang/en_US.lang": "item.gunmod.rifle.name=Ion Rifle\n"}))
+            self.assertIn("Ion Rifle", self.docs(f.ctx, "lang")["lang:gunmod"]["text"])
+            self.assertIn("Ion Rifle", self.docs(f.ctx, "guide")["guide:gunmod/guns.md"]["text"])
+
+    def test_missing_url_mod_is_never_claimed(self):
+        with Fixture() as f, mock.patch.dict(os.environ, {"DAVE_AGENT_ROOT": str(f.root)}):
+            tux = Tuxmine(f)
+            (tux.cache / "journeymap-unlimited.jar").unlink()
+            jm = next(e for e in f.ctx.extra_jars() if e["name"] == "journeymap-unlimited.jar")
+            self.assertIn("tuxmine:journeymap-unlimited.jar:%s:missing" % jm["sha256"], f.ctx.extra_inputs())
+            ident, why = s.pack_identity(f.ctx)
+            self.assertIsNone(ident)
+            self.assertIn("journeymap-unlimited.jar", why)
+            s.corpus_chunks(f.ctx)
+            self.assertIsNone(f.ctx.extracted["lang"]["pack"])
+            self.assertEqual(quiet(ix.stamp_current, f.ctx, s.DEFAULT_PROFILE, {}, ["corpus"], print), 1)
+            self.assertFalse((f.root / "data" / "packstate" / "corpus.json").exists())
+
+    def test_stamps_follow_the_data(self):
+        with Fixture() as f, mock.patch.dict(os.environ, {"DAVE_AGENT_ROOT": str(f.root)}):
+            tux = Tuxmine(f)
+            ps, stamps = s.load_packstate(), f.root / "data" / "packstate"
+            path = s.index_path(f.ctx)
+            index = s.build(f.ctx, FakeEmbedder(), path)
+            fp = ps.state()["fingerprints"]["corpus"]
+            self.assertEqual(index["meta"]["corpus_pack"], {k: fp for k in s.pack_kinds()})
+            self.assertEqual(index["meta"]["corpus_pack_label"], "GTNH 2.9.0, tuxmine server 0.1.0, client 0.1.0")
+            self.assertEqual(quiet(ix.stamp_current, f.ctx, s.DEFAULT_PROFILE, index["meta"]["corpus_pack"], ["corpus", "index"], print), 0)
+            self.assertEqual(quiet(ix.check, f.ctx, s.DEFAULT_PROFILE, path, print), [])
+
+            # A pack update: the index on disk was embedded from the old packs, so it can never be stamped as current.
+            tux.version("client", "0.1.1", "hash-1")
+            self.assertTrue(quiet(ix.check, f.ctx, s.DEFAULT_PROFILE, path, print))
+            self.assertEqual(quiet(ix.stamp_current, f.ctx, s.DEFAULT_PROFILE, index["meta"]["corpus_pack"], ["corpus", "index"], print), 1)
+            self.assertNotEqual(json.loads((stamps / "index.json").read_text())["fingerprint"], ps.state()["fingerprints"]["index"])
+            # A stamp that no longer matches the packs it claims is removed rather than left behind.
+            self.assertIsNone(s.stamp_pack(f.ctx, "index", fp))
+            self.assertFalse((stamps / "index.json").exists())
+
+            # Rebuilding re-reads the corpus against the new packs, and then both may be stamped.
+            index = s.build(f.ctx, FakeEmbedder(), path)
+            self.assertEqual(quiet(ix.stamp_current, f.ctx, s.DEFAULT_PROFILE, index["meta"]["corpus_pack"], ["corpus", "index"], print), 0)
+            self.assertEqual(quiet(ix.check, f.ctx, s.DEFAULT_PROFILE, path, print), [])
+            self.assertEqual(ps.check(["corpus", "index"]), [])
+
+    def test_without_a_pack_nothing_happens(self):
+        with Fixture() as f, mock.patch.dict(os.environ, {"DAVE_AGENT_ROOT": str(f.root)}):
+            Tuxmine(f)
+            ctx = s.Context(root=f.root, pack=f.root / "nopack", corpus=f.ctx.corpus, index=f.ctx.index,
+                            memory=f.ctx.memory, readonly=False)
+            self.assertEqual((ctx.extra_jars(), ctx.extra_inputs()), ([], []))
+            self.assertIsNone(s.fetch_extras(ctx))
+            self.assertIsNone(s.pack_identity(ctx)[0])
+            self.assertEqual(quiet(ix.stamp_current, ctx, s.DEFAULT_PROFILE, {}, ["corpus", "index"], print), 0)
+            self.assertFalse((f.root / "data" / "packstate").exists())
 
 
 if __name__ == "__main__":

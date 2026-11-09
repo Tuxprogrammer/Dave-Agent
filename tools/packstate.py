@@ -107,12 +107,14 @@ def _sha256(path):
     return h.hexdigest()
 
 
-def jars(fetch=False):
+def jars(fetch=False, tuxmine=None, cache=None):
     """Every jar in the tuxmine packs, merged across sides: name, sha256, packs (which packs carry it), origin
-    (file|url), url, path (local file, None for an unfetched URL mod)."""
+    (file|url), url, path (local file, None for an unfetched URL mod). tuxmine and cache override TUXMINE_DIR and
+    TUXMINE_JAR_CACHE for one call (a caller with its own root, e.g. the search corpus's tests)."""
     out = {}
+    cache = Path(cache) if cache else jar_cache()
     for side in ("server", "client"):
-        d = tuxmine_dir() / side
+        d = Path(tuxmine or tuxmine_dir()) / side
         idx = d / "index.toml"
         if not idx.is_file():
             continue
@@ -128,7 +130,7 @@ def jars(fetch=False):
                 dl = m.get("download", {})
                 if dl.get("hash-format") != "sha256":
                     raise SystemExit(f"{d / rel}: hash-format {dl.get('hash-format')!r}, expected sha256")
-                cached = jar_cache() / m["filename"]
+                cached = cache / m["filename"]
                 e = {"name": m["filename"], "sha256": dl["hash"], "origin": "url", "url": dl["url"],
                      "path": str(cached) if cached.is_file() and _sha256(cached) == dl["hash"] else None,
                      "display_name": m.get("name"), "pw_side": m.get("side")}
@@ -145,12 +147,11 @@ def jars(fetch=False):
     if fetch:
         for e in out.values():
             if e["path"] is None:
-                e["path"] = str(_download(e["url"], e["name"], e["sha256"]))
+                e["path"] = str(_download(e["url"], e["name"], e["sha256"], cache))
     return sorted(out.values(), key=lambda e: e["name"].lower())
 
 
-def _download(url, name, sha):
-    cache = jar_cache()
+def _download(url, name, sha, cache):
     cache.mkdir(parents=True, exist_ok=True)
     dest = cache / name
     tmp = cache / (name + ".part")

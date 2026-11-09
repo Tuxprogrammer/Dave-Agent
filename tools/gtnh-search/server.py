@@ -154,6 +154,8 @@ class Service:
             lines.append("Index: %d chunks from %d sources, profile %s, model %s" % (m["chunks"], m["sources"], m["profile"], m["model"]))
             lines.append("Per kind: " + ", ".join("%s %d" % kv for kv in sorted(m.get("kinds", {}).items())))
             lines.append("Built %s from pack %s" % (time.strftime("%Y-%m-%d %H:%M", time.localtime(m["built_at"])), m.get("pack") or "?"))
+            if m.get("corpus_pack_label"):
+                lines.append("Corpus extracted from %s" % m["corpus_pack_label"])
         else:
             lines.append("No index yet at %s." % self.path)
         if self.ctx.state:
