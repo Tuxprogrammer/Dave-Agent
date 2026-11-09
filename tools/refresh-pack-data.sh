@@ -11,6 +11,7 @@
 #   gtnh-src  tools/decomp/tuxmine_extras.py           source for the tuxmine extras (stock GTNH is regenerated
 #                                                       with tools/decomp/ when GTNH itself updates)
 #   recipes   tools/recipe-export/run.sh <pack>         headless export + data/recipes.sqlite (a few minutes, ~6 GB heap)
+#             tools/recipes/item_names.py               item names for the corpus, from the recipe database
 #   corpus    tools/gtnh-search/index.py --extract      quest/guide/lang text from GTNH + tuxmine jars (no API calls)
 #   index     tools/gtnh-search/index.py                embeddings of changed chunks (OpenRouter, OPENROUTER_API_KEY)
 #
@@ -48,13 +49,20 @@ if stale gtnh-src; then
   python3 -I tools/decomp/tuxmine_extras.py
 fi
 
+reextract=0
 if stale recipes; then
   log "recipes: export from $pack"
   tools/recipe-export/run.sh "$pack"
+  reextract=1
+fi
+if [[ $reextract == 1 || ! -f data/corpus/names/items.tsv ]]; then
+  log "recipes: item names for the corpus"
+  python3 -I tools/recipes/item_names.py
+  reextract=1
 fi
 
 reembed=0
-if stale corpus; then
+if [[ $reextract == 1 ]] || stale corpus; then
   log "corpus: extract"
   python3 -I tools/gtnh-search/index.py --extract
   reembed=1

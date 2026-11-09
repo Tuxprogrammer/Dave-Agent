@@ -25,6 +25,9 @@ Dave is an AI chat agent for the owner's **private GT New Horizons 2.9.0 server*
 **Dave runs in production as a Docker container** in the game server's docker stack on `game-host`, alongside the GTNH server container.
 
 - **Building and shipping.** The image is built from this repo, with private data (gtnh-src, corpus, indexes, recipe DB) baked in read-only, then shipped over the LAN.
+- **Pack-derived data must match the packs.** gtnh-src, the recipe DB, the search corpus and its embeddings each record the GTNH + tuxmine pack they were built from (`tools/packstate.py`, stamps in git-ignored `data/packstate/`).
+  - After any change to the GTNH base pack or to `tuxmine/server` or `tuxmine/client`, run `tools/refresh-pack-data.sh`. It rebuilds only what is stale, in dependency order.
+  - `dave/deploy/build.sh` refuses to build from stale data (`DAVE_ALLOW_STALE=1` overrides).
 - **Secrets are runtime-only** and never baked into the image: `CLAUDE_CODE_OAUTH_TOKEN`, `OPENROUTER_API_KEY`, the DaveBridge token.
 - **Dave's memory (`data/memory/`) is a persistent volume** on the server, so rebuilding the image never touches it. Its long-term, versioned history is a git repo on a second volume (`dave-memory-history`, `dave/memory/history.py`).
 - **This repo is public.** Memories hold player data, so they never come back into it (`data/memory/` is git-ignored apart from its README). Never commit hostnames, usernames, home paths, IPs, tokens or player data; real site names live in git-ignored files.

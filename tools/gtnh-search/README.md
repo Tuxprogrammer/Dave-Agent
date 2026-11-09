@@ -42,11 +42,11 @@ The code is ported from GregGuns' `tools/semantic-search` (same owner, itself po
   - An extraction that finds nothing never replaces a non-empty cache.
   - A refresh loads `lang` first and rebuilds item names on every pass, so a long-running server renders with current names.
 - **Item names.** Quest tasks and guide tags name items by registry ID and damage. Names are looked up in this order:
-  1. `data/corpus/names/items.tsv` (`mod:reg<TAB>damage-or-*<TAB>name`). Generate it from the recipe database once that exists; it fixes every name below.
+  1. `data/corpus/names/items.tsv` (`mod:reg<TAB>damage-or-*<TAB>name`): every item's in-game name from the recipe database, written by `tools/recipes/item_names.py` (`tools/refresh-pack-data.sh` runs it after each recipe export and then re-extracts the corpus).
   2. GregTech's generated items, worked out from its source in `gtnh-src/` (material IDs, ore prefixes, special metaitems, machine IDs; cached in `data/corpus/names/gregtech.json`, keyed on the source files, so a regenerated `gtnh-src` refreshes it).
   3. The `en_US.lang` keys a registry name usually maps to.
 
-  On 2.9.0 this resolves 6,137 of the 9,601 quest task items (64%). The rest keep their raw ID, for example bees, Bartworks materials and some AE2 and GT++ parts.
+  With `items.tsv`, about 350 raw item IDs remain in the whole quest text (5,435 without it), mostly items no recipe touches.
 - **Chunks.** At most 6,000 characters each; small neighbours are merged and long sections split. Each chunk is embedded as `[kind] title` plus its text.
 - **Embeddings.** OpenRouter, with `input_type` set to `document` or `query` and provider data collection denied. Models that don't take `input_type` get a query instruction instead (`MODEL_OPTIONS` in `semsearch.py`). A refresh embeds only chunks whose text changed.
   - Document batches get 7 attempts with a 180 s timeout. A player's query gets 2 attempts with a 20 s timeout (`QUERY_ATTEMPTS`, `QUERY_TIMEOUT`).
@@ -240,8 +240,7 @@ python3 -I tools/living-wiki/living_wiki.py export      # git bundle of the livi
 ## Limits
 
 - Quests and guide pages can lag behind the pack. Check numbers against the recipe tools before quoting them.
-- About a third of quest task items show a raw ID until `data/corpus/names/items.tsv` exists.
-- Our extra mods' items resolve through their lang keys (GregGuns' guns, gear and ammo, EZStorage's blocks), but GregGuns' GregTech machines (`gregtech:gt.blockmachines:201xx`) keep their raw ID: their meta IDs are in GregGuns' source, which `gtnh-src/` doesn't hold. `items.tsv` from the recipe database will fix them.
+- Items that appear in no recipe and have no lang key (some bees, Bartworks materials) still show a raw ID.
 - Scores compare well within one kind; across kinds they are only a rough guide.
 - Changing a profile's model starts a new index file and a full re-embed.
 - After changing an extractor, bump `EXTRACT_VERSION` in `semsearch.py` or run `index.py --extract`, so the cached documents are rebuilt.

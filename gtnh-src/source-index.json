@@ -3817,8 +3817,18 @@
   "decompOrigin": null,
   "sourcesJar": null,
   "apiSource": null,
-  "notes": "\"fairplay\" is a build flavour of the same source (project.properties fairPlay=FairPlay). Client-only: jar not in the server pack, so no decompile exists.",
-  "searched": []
+  "notes": "\"fairplay\" is a build flavour of the same source (project.properties fairPlay=FairPlay). Client-only: jar not in the server pack, so no decompile exists. Tuxmine: Our packs ship the \"unlimited\" build flavour of JourneyMap 5.2.23 on both client and server (stock GTNH ships the fairplay flavour, client only). Same source: gtnh-src/source/journeymap-legacy/; its shipped mixin configs and lang files are in gtnh-src/mods/journeymap/.",
+  "searched": [],
+  "tuxmine": {
+   "jar": "journeymap-1.7.10-5.2.23-unlimited.jar",
+   "sha256": "7d964278447412f9fc644c2b3f91e9fab73444aa9247b9b2cf31444cf6ca4646",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": "https://cdn.modrinth.com/data/lfHFW1mp/versions/pQmw6aS6/journeymap-1.7.10-5.2.23-unlimited.jar",
+   "resourcesPath": "gtnh-src/mods/journeymap/"
+  }
  },
  {
   "modId": "JourneyMapServer",
@@ -7011,5 +7021,682 @@
    "github.com/GTNewHorizons/Ztones-Unofficial (rewrite, not shipped)",
    "github.com/TehNut/Xtones (clone for later MC)"
   ]
+ },
+ {
+  "modId": "davebridge",
+  "modIds": [
+   "davebridge"
+  ],
+  "name": "DaveBridge",
+  "manifestName": null,
+  "jar": "davebridge-0.2.6.jar",
+  "packVersion": "0.2.6",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/Tuxprogrammer/Dave-Agent",
+  "ref": "c2b84de20620171e248e8bcaf8eb142186d0a4ee",
+  "refKind": "commit",
+  "commit": "c2b84de20620171e248e8bcaf8eb142186d0a4ee",
+  "commitDate": "2026-11-01",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/DaveBridge/",
+  "decompPath": "gtnh-src/mods/davebridge/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Dave's own mod, from this repository. The release commit is found from a davebridge-v<version> tag, else the commit whose subject names \"DaveBridge <version>\", cross-checked against the commit that added the jar to a tuxmine pack, and verified against the jar's class list and lang file. Found by: commit subject names \"DaveBridge 0.2.6\"; commit added the jar to the tuxmine pack. Snapshot of DaveBridge/ at that commit via git archive (no .git; .SNAPSHOT_OK holds the commit).",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "davebridge-0.2.6.jar",
+   "sha256": "a0c683348599454648800e67343eba70316670a655882667f98eee280ddaa6ab",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": null,
+   "resourcesPath": "gtnh-src/mods/davebridge/",
+   "ours": true,
+   "jarClassCoverage": "93/93",
+   "generatedClasses": [],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": "discordintegration",
+  "modIds": [
+   "discordintegration"
+  ],
+  "name": "DiscordIntegration (unofficial 1.7.10 build)",
+  "manifestName": null,
+  "jar": "DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar",
+  "packVersion": "3.1.1_3.8.3_464",
+  "side": "SERVER",
+  "repoUrl": "https://github.com/Miradae/DiscordIntegration",
+  "ref": "4fde36649eec7f3dfcc8f3b800c786d4c9e395e2",
+  "refKind": "commit",
+  "commit": "4fde36649eec7f3dfcc8f3b800c786d4c9e395e2",
+  "commitDate": "2020-12-23",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "AGPL-3.0",
+  "licenseNote": "LICENSE.md=AGPL-3.0",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/DiscordIntegration/",
+  "decompPath": "gtnh-src/mods/DiscordIntegrationUnoffical/",
+  "decompOrigin": "decompiled (chikachi.discord)",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Unofficial 1.7.10 build 3.1.1 of Chikachi's DiscordIntegration by Miradae (co-author in mcmod.info), CurseForge file 3147365. Miradae's fork, branch v3/mc1.7, head commit 4fde366 (2020-12-23, \"updated jda to 3.8.3_464\") has modVersion 3.1.1, jdaVersion 3.8.3 and jdaJob 464 in build.gradle, which is exactly the jar version. Chikachi's own 1.7 line stops at 3.0.5. The mod's own classes (chikachi.discord.*, chikachi.discord.core.*) were also decompiled into mods/ because the core submodule commit is unpublished. Sending to Discord: chikachi.discord.core.DiscordClient (getInstance(), broadcast(...)) and the JDA bundle. Pinned commit 4fde36649eec on branch v3/mc1.7.",
+  "searched": [
+   "mcmod.info url https://discordintegration.net (project site, no source link for this build)",
+   "github.com/Chikachi/DiscordIntegration (tags up to 2.1.0-MC1.7.10; branch v3/mc1.7 ends at 3.0.5, 2018-03-18)",
+   "forks of Chikachi/DiscordIntegration: Miradae (v3/mc1.7 = 3.1.1_3.8.3_464, FOUND), BallOfEnergy1 (v4/mc1.7 differs, later), TimeConqueror (v5/mc-1.7 rewrite), obsoletelabs (mirror)",
+   "github.com/Chikachi/DiscordIntegrationCore and its 12 forks (core commit c7385b9 not published anywhere)",
+   "GitHub repo search \"DiscordIntegration 1.7.10\" (Dasfaust/DiscordIntegrationRetro, unilock/DCIntegration-1.7.10: different mods)"
+  ],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar",
+   "sha256": "16a34f1e5e896dfad956b8cb731dcc85409650335257a103ea31b3bb9e109b46",
+   "packs": [
+    "server"
+   ],
+   "download": "https://edge.forgecdn.net/files/3147/365/DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar",
+   "resourcesPath": "gtnh-src/mods/DiscordIntegrationUnoffical/",
+   "ours": false,
+   "jarClassCoverage": "61/61",
+   "generatedClasses": [],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  },
+  "submodules": [
+   {
+    "repoUrl": "https://github.com/Chikachi/DiscordIntegrationCore",
+    "ref": "master",
+    "refKind": "branch",
+    "notes": "The fork pins core at c7385b932d58fffac6c2ad82fbbfa9e694d38227, which was never published (not in Chikachi/DiscordIntegrationCore or any fork of it). This is upstream master (code last changed 2018-06-29); its 61 top-level classes match the jar's class list exactly, but the bodies may differ where the fork adapted core to JDA 3.8.3. The decompile in mods/ is authoritative for chikachi.discord.core.",
+    "path": "gtnh-src/source/DiscordIntegration/core/",
+    "commit": "54725b7d293f659b4067a1b0869a7a9df7d0db25",
+    "license": "AGPL-3.0",
+    "match": "nearest"
+   }
+  ]
+ },
+ {
+  "modId": "fortunateone",
+  "modIds": [
+   "fortunateone"
+  ],
+  "name": "Fortunate One",
+  "manifestName": null,
+  "jar": "fortunateone-v1.1.11.jar",
+  "packVersion": "v1.1.11",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/Tuxprogrammer/Fortunate-One",
+  "ref": "v1.1.11",
+  "refKind": "tag",
+  "commit": "af481bf77084dbf875f290b5e7c3d77f807a7e7b",
+  "commitDate": "2026-11-05",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/Fortunate-One/",
+  "decompPath": "gtnh-src/mods/fortunateone/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "fortunateone-v1.1.11.jar",
+   "sha256": "b799aa2d8e95dd5e407ef1eb65008fb0a6235417526c0267ca433c40b459749e",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": "https://github.com/Tuxprogrammer/Fortunate-One/releases/download/v1.1.11/fortunateone-v1.1.11.jar",
+   "resourcesPath": "gtnh-src/mods/fortunateone/",
+   "ours": true,
+   "jarClassCoverage": "16/16",
+   "generatedClasses": [
+    "io.github.tuxprogrammer.fortunateone.Tags"
+   ],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": "gregguns",
+  "modIds": [
+   "gregguns"
+  ],
+  "name": "GregGuns",
+  "manifestName": null,
+  "jar": "gregguns-0.4.0-beta.jar",
+  "packVersion": "0.4.0-beta",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/Tuxprogrammer/GregGuns",
+  "ref": "0.4.0-beta",
+  "refKind": "tag",
+  "commit": "282b324496f5fcc11ce7dae40ee70add1298ee7a",
+  "commitDate": "2026-11-07",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/GregGuns/",
+  "decompPath": "gtnh-src/mods/gregguns/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "gregguns-0.4.0-beta.jar",
+   "sha256": "3098dabf07c7c37b701b175a5a9f4eaac2d46ae770de25ee10625811db33ebac",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": null,
+   "resourcesPath": "gtnh-src/mods/gregguns/",
+   "ours": true,
+   "jarClassCoverage": "1589/1589",
+   "generatedClasses": [
+    "com.gregguns.Tags"
+   ],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": "gtnhrates",
+  "modIds": [
+   "gtnhrates"
+  ],
+  "name": "GTNH Rates",
+  "manifestName": null,
+  "jar": "gtnhrates-1.12.0-2.9.jar",
+  "packVersion": "1.12.0-2.9",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/Sladki/GTNHRates",
+  "ref": "1.12.0-2.9",
+  "refKind": "tag",
+  "commit": "8accbdc2b0a2beda49a01bcabf7ce2243b691935",
+  "commitDate": "2026-11-02",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "LGPL-3.0",
+  "licenseNote": "LICENSE=LGPL-3.0",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/GTNHRates/",
+  "decompPath": "gtnh-src/mods/gtnhrates/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Version is <mod version>-<GTNH line>; the tag carries both.",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "gtnhrates-1.12.0-2.9.jar",
+   "sha256": "d67dc2061669150ee6dbf1d5757a15c99c97ec80eac5bf462fd9e284bc47ef3e",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": "https://github.com/Sladki/GTNHRates/releases/download/1.12.0-2.9/gtnhrates-1.12.0-2.9.jar",
+   "resourcesPath": "gtnh-src/mods/gtnhrates/",
+   "ours": false,
+   "jarClassCoverage": "36/36",
+   "generatedClasses": [
+    "com.github.sladki.gtnhrates.Tags"
+   ],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": null,
+  "modIds": [],
+  "name": "JDA (bundled in DiscordIntegration (unofficial 1.7.10 build))",
+  "manifestName": null,
+  "jar": "DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar",
+  "packVersion": "v3.8.3",
+  "side": "SERVER",
+  "repoUrl": "https://github.com/DV8FromTheWorld/JDA",
+  "ref": "v3.8.3",
+  "refKind": "tag",
+  "commit": "8ecbbe354d03f6bf448411bba573d0d4c268b560",
+  "commitDate": "2019-02-12",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "Apache-2.0",
+  "licenseNote": "LICENSE=Apache-2.0",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/JDA/",
+  "decompPath": null,
+  "decompOrigin": null,
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Java Discord API 3.8.3 (CI build 464), shaded into the DiscordIntegration jar and relocated from net.dv8tion.jda to chikachi.discord.repack.net.dv8tion.jda. Use it to read the message-sending API (TextChannel.sendMessage(...).queue()). Runtime package: chikachi.discord.repack.net.dv8tion.jda.",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar",
+   "sha256": "16a34f1e5e896dfad956b8cb731dcc85409650335257a103ea31b3bb9e109b46",
+   "packs": [
+    "server"
+   ],
+   "download": "https://edge.forgecdn.net/files/3147/365/DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar",
+   "resourcesPath": "gtnh-src/mods/DiscordIntegrationUnoffical/",
+   "bundled": true,
+   "runtimePackage": "chikachi.discord.repack.net.dv8tion.jda"
+  }
+ },
+ {
+  "modId": "lostcitiesnh",
+  "modIds": [
+   "lostcitiesnh"
+  ],
+  "name": "Lost Cities: New Horizons",
+  "manifestName": null,
+  "jar": "lostcitiesnh-0.4.1-beta.jar",
+  "packVersion": "0.4.1-beta",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/Tuxprogrammer/LostCities",
+  "ref": "0.4.1-beta",
+  "refKind": "tag",
+  "commit": "5909aed87dd1d24d9ba24aea8a8ac2f676dbd4f4",
+  "commitDate": "2026-11-07",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/LostCities/",
+  "decompPath": "gtnh-src/mods/lostcitiesnh/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Lost Cities: New Horizons, the owner's 1.7.10 port of McJty's Lost Cities.",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "lostcitiesnh-0.4.1-beta.jar",
+   "sha256": "c63ca6ab13b76a1ae7b4986296eec87d66b6c22a4463b04bcb6a87e45c100c6c",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": "https://github.com/Tuxprogrammer/LostCities/releases/download/0.4.1-beta/lostcitiesnh-0.4.1-beta.jar",
+   "resourcesPath": "gtnh-src/mods/lostcitiesnh/",
+   "ours": true,
+   "jarClassCoverage": "527/527",
+   "generatedClasses": [
+    "com.tuxprogrammer.lostcities.Tags"
+   ],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": "qz_miner",
+  "modIds": [
+   "qz_miner"
+  ],
+  "name": "Qz Miner",
+  "manifestName": null,
+  "jar": "qz_miner-5.5.1.jar",
+  "packVersion": "5.5.1",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/QuanhuZeYu/Qz-Miner",
+  "ref": "5.5.1",
+  "refKind": "tag",
+  "commit": "84618cc7358779f3c84b86943cafdce3cc4038f9",
+  "commitDate": "2026-11-03",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "src/main/resources/LICENSE=MIT; no plain LICENSE file at the repo root; unfilled template text, no copyright holder named",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/Qz-Miner/",
+  "decompPath": "gtnh-src/mods/qz_miner/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "qz_miner-5.5.1.jar",
+   "sha256": "71b9b5e680e42cfdc5e642034985c06ab2ff844b65f9854465302343e47066e2",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": "https://github.com/QuanhuZeYu/Qz-Miner/releases/download/5.5.1/qz_miner-5.5.1.jar",
+   "resourcesPath": "gtnh-src/mods/qz_miner/",
+   "ours": false,
+   "jarClassCoverage": "351/351",
+   "generatedClasses": [
+    "club.heiqi.qz_miner.NetworkVersionRange",
+    "club.heiqi.qz_miner.Tags"
+   ],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": "qz_uilib",
+  "modIds": [
+   "qz_uilib"
+  ],
+  "name": "Qz UILib",
+  "manifestName": null,
+  "jar": "qz_uilib-5.0.0-beta5.jar",
+  "packVersion": "5.0.0-beta5",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/QuanhuZeYu/Qz-UILib",
+  "ref": "5.0.0-beta5",
+  "refKind": "tag",
+  "commit": "3543ab0248c91ecab9df6b904c6bef19994d475a",
+  "commitDate": "2026-11-03",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/Qz-UILib/",
+  "decompPath": "gtnh-src/mods/qz_uilib/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "The Forge 1.7.10 host mod. The core-java8 and font-adapter-java8 jars next to it are separate libraries from the Qz-UILib-Core and Qz-UILib-Platform repos (same version tag).",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "qz_uilib-5.0.0-beta5.jar",
+   "sha256": "a3be2bdc69716d6e0ab4b0b836e7accf0dd4f80939acdcca8fa536da0c9d6a87",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": null,
+   "resourcesPath": "gtnh-src/mods/qz_uilib/",
+   "ours": false,
+   "jarClassCoverage": "45/82",
+   "generatedClasses": [],
+   "classesSourcedElsewhere": {
+    "source/Qz-UILib-Platform/": 37
+   },
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": null,
+  "modIds": [],
+  "name": "Qz UILib Compat",
+  "manifestName": null,
+  "jar": "qz_uilib_compat-1.0.0-beta3.jar",
+  "packVersion": "1.0.0-beta3",
+  "side": "CLIENT",
+  "repoUrl": "https://github.com/QuanhuZeYu/Qz-UILib-Compat",
+  "ref": "1.0.0-beta3",
+  "refKind": "tag",
+  "commit": "1f72e1421404e39efce30c737b0ca9b1fc37ab31",
+  "commitDate": "2026-11-03",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/Qz-UILib-Compat/",
+  "decompPath": "gtnh-src/mods/qz_uilib_compat/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "qz_uilib_compat-1.0.0-beta3.jar",
+   "sha256": "96e027630cb903f5906800eb9ecd0eb256b95bd01db81234c4507d806f682644",
+   "packs": [
+    "client"
+   ],
+   "download": "https://github.com/QuanhuZeYu/Qz-UILib-Compat/releases/download/1.0.0-beta3/qz_uilib_compat-1.0.0-beta3.jar",
+   "resourcesPath": "gtnh-src/mods/qz_uilib_compat/",
+   "ours": false,
+   "jarClassCoverage": "34/36",
+   "generatedClasses": [],
+   "classesSourcedElsewhere": {
+    "source/Qz-UILib-Platform/": 1
+   },
+   "classesWithoutSource": [
+    "club.heiqi.uilib.compat.CompatVersion"
+   ]
+  }
+ },
+ {
+  "modId": null,
+  "modIds": [],
+  "name": "Qz UILib core (Java 8 library jar)",
+  "manifestName": null,
+  "jar": "qz_uilib-core-java8-5.0.0-beta5.jar",
+  "packVersion": "5.0.0-beta5",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/QuanhuZeYu/Qz-UILib-Core",
+  "ref": "5.0.0-beta5",
+  "refKind": "tag",
+  "commit": "2bfdda6bcce7799a1ab2555f9a1bf20f5a17feb9",
+  "commitDate": "2026-11-03",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/Qz-UILib-Core/",
+  "decompPath": "gtnh-src/mods/qz_uilib-core-java8/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Platform-free UI core library (Maven asia.quanhuzeyu.uilib:core:<version>:java8), no mcmod.info. Qz-UILib pulls it in from Maven; its source is the separate Qz-UILib-Core repo at the same version tag.",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "qz_uilib-core-java8-5.0.0-beta5.jar",
+   "sha256": "37ee9505f5943f32fd5ad543069628cead12d6724beb956336c4a39434c58c54",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": null,
+   "resourcesPath": "gtnh-src/mods/qz_uilib-core-java8/",
+   "ours": false,
+   "jarClassCoverage": "387/388",
+   "generatedClasses": [],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": [
+    "club.heiqi.uilib.ui.reactive.Tracker"
+   ]
+  }
+ },
+ {
+  "modId": null,
+  "modIds": [],
+  "name": "Qz UILib font adapter (Java 8 library jar)",
+  "manifestName": null,
+  "jar": "qz_uilib-font-adapter-java8-5.0.0-beta5.jar",
+  "packVersion": "5.0.0-beta5",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/QuanhuZeYu/Qz-UILib-Platform",
+  "ref": "5.0.0-beta5",
+  "refKind": "tag",
+  "commit": "6d6437c105ec947104734d48363f392cfe94feee",
+  "commitDate": "2026-11-03",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/Qz-UILib-Platform/",
+  "decompPath": "gtnh-src/mods/qz_uilib-font-adapter-java8/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Font adapter library (Maven asia.quanhuzeyu.uilib:font-adapter:<version>:java8), no mcmod.info. Its source is the Qz-UILib-Platform repo (font, render, media and desktop adapters) at the same version tag.",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "qz_uilib-font-adapter-java8-5.0.0-beta5.jar",
+   "sha256": "62c66cfd37768b1d9dbf80651ec61880221d2d76cad2fb9e2e3a411575aaf357",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": null,
+   "resourcesPath": "gtnh-src/mods/qz_uilib-font-adapter-java8/",
+   "ours": false,
+   "jarClassCoverage": "5/5",
+   "generatedClasses": [],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": "ezstorage",
+  "modIds": [
+   "ezstorage"
+  ],
+  "name": "Simple Storage",
+  "manifestName": null,
+  "jar": "ezstorage-1.8.2.jar",
+  "packVersion": "1.8.2",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/LITW-Refined/EZStorage",
+  "ref": "1.8.2",
+  "refKind": "tag",
+  "commit": "7acb8f38244300424bfa003d1a5cfc5d0ca78e96",
+  "commitDate": "2026-10-07",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "MIT",
+  "licenseNote": "LICENSE.txt=MIT",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/EZStorage/",
+  "decompPath": "gtnh-src/mods/ezstorage/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "ezstorage-1.8.2.jar",
+   "sha256": "45f4cf15254ad090f6e2c409d02cb69c06d1823ae48bc89007c3b6c4ca1836b5",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": "https://github.com/LITW-Refined/EZStorage/releases/download/1.8.2/ezstorage-1.8.2.jar",
+   "resourcesPath": "gtnh-src/mods/ezstorage/",
+   "ours": false,
+   "jarClassCoverage": "89/89",
+   "generatedClasses": [
+    "com.zerofall.ezstorage.Tags"
+   ],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": "worldedit",
+  "modIds": [
+   "worldedit"
+  ],
+  "name": "WorldEdit",
+  "manifestName": null,
+  "jar": "worldedit-v0.0.9.jar",
+  "packVersion": "v0.0.9",
+  "side": "BOTH",
+  "repoUrl": "https://github.com/GTNewHorizons/worldedit-gtnh",
+  "ref": "v0.0.9",
+  "refKind": "tag",
+  "commit": "369cb6b9b449fc41b17d42990d93f8a747dd573f",
+  "commitDate": "2026-03-06",
+  "match": "exact",
+  "sourceKind": "original",
+  "license": "AGPL-3.0",
+  "licenseNote": "LICENSE=AGPL-3.0",
+  "manifestLicense": null,
+  "path": "gtnh-src/source/worldedit-gtnh/",
+  "decompPath": "gtnh-src/mods/worldedit/",
+  "decompOrigin": "resources-only",
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "GTNH's WorldEdit fork for 1.7.10 (com.sk89q.worldedit).",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "worldedit-v0.0.9.jar",
+   "sha256": "6b5a76418751b5fc1ff16319d963d128e62855767499ad0ded0edad0fecb1b1e",
+   "packs": [
+    "server",
+    "client"
+   ],
+   "download": "https://github.com/GTNewHorizons/worldedit-gtnh/releases/download/v0.0.9/worldedit-v0.0.9.jar",
+   "resourcesPath": "gtnh-src/mods/worldedit/",
+   "ours": false,
+   "jarClassCoverage": "687/687",
+   "generatedClasses": [],
+   "classesSourcedElsewhere": {},
+   "classesWithoutSource": []
+  }
+ },
+ {
+  "modId": null,
+  "modIds": [],
+  "name": "WorldEditCuiFe-v1.0.7-mf-1.7.10-10.13.4.1566",
+  "manifestName": null,
+  "jar": "WorldEditCuiFe-v1.0.7-mf-1.7.10-10.13.4.1566.jar",
+  "packVersion": "",
+  "side": "CLIENT",
+  "repoUrl": null,
+  "ref": null,
+  "refKind": null,
+  "commit": null,
+  "commitDate": null,
+  "match": "none",
+  "sourceKind": null,
+  "license": "unknown",
+  "licenseNote": "not sourced",
+  "manifestLicense": null,
+  "path": null,
+  "decompPath": null,
+  "decompOrigin": null,
+  "sourcesJar": null,
+  "apiSource": null,
+  "notes": "Skipped on purpose: Client-only render overlay (WorldEdit CUI Forge Edition): draws WorldEdit selections on the player's screen, never runs on the server and has no API Dave scripts against.",
+  "searched": [],
+  "tuxmineExtra": true,
+  "tuxmine": {
+   "jar": "WorldEditCuiFe-v1.0.7-mf-1.7.10-10.13.4.1566.jar",
+   "sha256": "fafc2dc319b50018e63712cfd087f1f32c112443e37dbdc1c09bf84bd2bc514a",
+   "packs": [
+    "client"
+   ],
+   "download": null,
+   "resourcesPath": null
+  }
  }
 ]

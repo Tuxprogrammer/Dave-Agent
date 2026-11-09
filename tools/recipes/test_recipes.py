@@ -21,6 +21,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import build_db  # noqa: E402
+import item_names  # noqa: E402
 import recipedb as R  # noqa: E402
 import server  # noqa: E402
 
@@ -177,6 +178,23 @@ class QueryTests(SampleDB):
         self.assertLessEqual(lv, all_)
         _, cold = R.recipes_touching(self.con, STEEL, "out", heat=999, machine="gt.recipe.blastfurnace")
         self.assertEqual(cold, 0)
+
+
+class ItemNamesTests(SampleDB):
+    def test_overlay_from_db(self):
+        out = Path(self.tmp.name) / "items.tsv"
+        self.assertEqual(item_names.main(["--db", str(self.db), "--out", str(out)]), 0)
+        lines = out.read_text(encoding="utf-8").splitlines()
+        self.assertTrue(lines[0].startswith("#"))
+        rows = [line.split("\t") for line in lines[1:]]
+        self.assertTrue(rows)
+        self.assertTrue(all(len(r) == 3 and r[1].isdigit() and r[2] for r in rows))
+        self.assertFalse([r for r in rows if "\u00a7" in r[2] or r[2].endswith(".name")])
+        names = {(r[0], r[1]): r[2] for r in rows}
+        self.assertEqual(len(names), len(rows))
+        reg, _, meta = STEEL.partition("@")
+        steel = self.con.execute("SELECT registry, name FROM items WHERE id = ?", (STEEL,)).fetchone()
+        self.assertEqual(names.get((steel[0], meta)), steel[1])
 
 
 class ServerTests(SampleDB):

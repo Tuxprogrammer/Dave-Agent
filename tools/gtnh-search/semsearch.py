@@ -779,6 +779,18 @@ PREFIX_DEF = re.compile(r"OrePrefixes (\w+) = new OrePrefixBuilder\(\"\w+\"\)(.*
 META_SUPER = re.compile(r"super\(\s*\"metaitem\.(0\d)\"\s*,(.*?)\);", re.S)
 
 
+def gt_root_names(ctx, roots):
+    """The GregTech source roots as recorded in gregtech.json: relative to the repo root when under it, so the cache,
+    which is committed to a public repo, never records a local home path."""
+    out = []
+    for p in roots:
+        try:
+            out.append(Path(p).resolve().relative_to(Path(ctx.root).resolve()).as_posix())
+        except ValueError:
+            out.append(str(p))
+    return out
+
+
 def gt_tables(ctx):
     """Names for GregTech's generated items, parsed (never run) from its source: material ids, the ore prefix list of
     each gt.metaitem.0N, the special items in those metaitems, and machine meta ids. Cached in names/gregtech.json."""
@@ -791,7 +803,8 @@ def gt_tables(ctx):
         except (OSError, ValueError):
             cached = None
         if cached is not None and (ctx.readonly or not roots or (
-                cached.get("roots") == [str(p) for p in roots] and cached.get("v") == EXTRACT_VERSION and cached.get("fp") == fp)):
+                cached.get("roots") == gt_root_names(ctx, roots) and cached.get("v") == EXTRACT_VERSION
+                and cached.get("fp") == fp)):
             return cached
     materials, mat_names, enum_ids, item_enums, regs, prefixes, lists, items = {}, {}, {}, {}, [], {}, {}, {}
     for root in roots:
@@ -838,7 +851,7 @@ def gt_tables(ctx):
             if enum in ids:
                 table.setdefault(str(ids[enum]), label)
     out = {
-        "v": EXTRACT_VERSION, "roots": [str(p) for p in roots],
+        "v": EXTRACT_VERSION, "roots": gt_root_names(ctx, roots),
         "materials": {str(i): mat_names.get(m, camel_words(m)) for i, m in materials.items()},
         "prefixes": {num: [prefixes.get(p) if p and not p.startswith("___") else None for p in lst] for num, lst in lists.items()},
         "metaitems": metaitems, "machines": machines,
