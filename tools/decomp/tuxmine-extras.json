@@ -90,7 +90,7 @@
       "name": "Qz UILib Compat"
     },
     {
-      "jar": "worldedit-(?P<version>v.+)\\.jar",
+      "jar": "worldedit-(?P<version>v?[0-9].*)\\.jar",
       "kind": "git",
       "repo": "https://github.com/GTNewHorizons/worldedit-gtnh",
       "tag": "{version}",

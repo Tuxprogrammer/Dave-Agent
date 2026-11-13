@@ -297,7 +297,7 @@ Jars our tuxmine packs add on top of the GTNH pack. The source is in `gtnh-src/s
 | qz_uilib-core-java8-5.0.0-beta5.jar | server+client | - | Qz UILib core (Java 8 library jar) | - | resources-only | mods/qz_uilib-core-java8/ | 0 | source/Qz-UILib-Core/ |
 | qz_uilib-font-adapter-java8-5.0.0-beta5.jar | server+client | - | Qz UILib font adapter (Java 8 library jar) | - | resources-only | mods/qz_uilib-font-adapter-java8/ | 0 | source/Qz-UILib-Platform/ |
 | qz_uilib_compat-1.0.0-beta3.jar | client | - | Qz UILib Compat | - | resources-only | mods/qz_uilib_compat/ | 0 | source/Qz-UILib-Compat/ |
-| worldedit-v0.0.9.jar | server+client | worldedit | WorldEdit | v0.0.9 | resources-only | mods/worldedit/ | 0 | source/worldedit-gtnh/ |
+| worldedit-1.0.1.jar | server+client | worldedit | WorldEdit | 1.0.1 | resources-only | mods/worldedit/ | 0 | source/worldedit-gtnh/ |
 
 ### Skipped tuxmine jars
 

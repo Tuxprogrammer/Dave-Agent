@@ -29,6 +29,7 @@ KNOWN_JARS = {
     "qz_uilib-font-adapter-java8-5.0.0-beta5.jar": "5.0.0-beta5",
     "qz_uilib_compat-1.0.0-beta3.jar": "1.0.0-beta3",
     "worldedit-v0.0.9.jar": "v0.0.9",
+    "worldedit-1.0.1.jar": "1.0.1",
     "davebridge-0.2.6.jar": "0.2.6",
     "DiscordIntegrationUnoffical-mc1.7.10-3.1.1_3.8.3_464.jar": "3.1.1_3.8.3_464",
     "journeymap-1.7.10-5.2.23-unlimited.jar": "5.2.23",
